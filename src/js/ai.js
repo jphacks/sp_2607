@@ -1,0 +1,83 @@
+// Claudeへの問い合わせ（レシートの読み取り）
+// 今は claude.ai の sample 機能を使う。API版にするときは analyze() の中身だけ差し替えればよい。
+(function(App){
+"use strict";
+const { num } = App.util;
+
+let sample = null, imgLimits = null;
+
+// 戻り値: { available, imgLimits }  imgLimits は写真を送れないときは null
+async function init(){
+  try { sample = window.claude ? await window.claude.use("sample") : null; } catch { sample = null; }
+  if(sample){
+    const lim = await sample.limits().catch(() => null);
+    imgLimits = lim?.images ?? null;
+  }
+  return { available: !!sample, imgLimits };
+}
+
+function buildPrompt(nR, hasBox){
+  // 返答はキー名なしの配列にして、出力トークン（入力の5倍の単価）を減らす
+  return `画像${nR}枚はレシート${nR > 1 ? "（分割撮影。重複行は1回だけ数える）" : ""}${hasBox ? "、最後の1枚は詰める袋か箱" : ""}。
+商品行ごとに1要素（値引き・袋代・小計・税・支払い行は除く）：
+[名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信]
+形 b=箱・パック c=缶・ボトル・カップ s=袋物・野菜・パン
+性質 F=つぶれやすい U=立てないとこぼれる 両方ならFU なければ""
+温度 f=冷凍 c=冷蔵 r=常温　分別 r=肉魚 x=洗剤など非食品 ""=なし　確信 1=特定できた 0=推測
+${hasBox ? "箱袋は内寸[幅,奥行,高さ(袋は持ち手の付け根まで),b=箱/g=袋]をレシート幅58/80mmやサイズ表記を物差しに推定。\n" : ""}JSONのみで返答：
+{"m":"詰め方の要点(30字以内)","c":${hasBox ? "[30,15,28,\"g\"]" : "null"},"i":[["卵10個パック",1,26,11,7,0.65,"b","F","c","",1]],"w":["注意(なければ空)"]}
+レシートが無ければ i を空にし m に理由。`;
+}
+
+// AIの短い配列形式を、アプリ内で使う形に戻す
+function normalize(raw){
+  const r = raw && typeof raw === "object" ? raw : {};
+  const SHAPE = { b:"box", c:"cylinder", s:"soft" }, TEMP = { f:"frozen", c:"chilled", r:"room" }, SEP = { r:"raw", x:"chemical" };
+  const items = (Array.isArray(r.i) ? r.i : []).filter(Array.isArray).slice(0, 60).map((a, i) => {
+    const [name, qty, w, d, h, kg, shape, flags, temp, sep, conf] = a;
+    const f = String(flags ?? "").toUpperCase();
+    return {
+      id: "i" + i, receipt: "", tip: "",
+      name: String(name ?? "商品"),
+      qty: Math.round(num(qty, 0, 30, 1)),
+      w: num(w, 0.5, 80, 10), d: num(d, 0.5, 80, 10), h: num(h, 0.5, 80, 10),
+      kg: num(kg, 0, 30, 0.3),
+      shape: SHAPE[shape] || "box",
+      fragile: f.includes("F"), upright: f.includes("U"),
+      temp: TEMP[temp] || "room",
+      separate: SEP[sep] || "none",
+      confident: Number(conf) !== 0
+    };
+  });
+  let c = null;
+  const rc = r.c;
+  if(Array.isArray(rc) && Number(rc[0]) > 0 && Number(rc[1]) > 0 && Number(rc[2]) > 0){
+    const box = rc[3] === "b";
+    c = { id:"photo", group:"写真", label: box ? "写真の箱" : "写真の袋", kind: box ? "box" : "bag",
+          W:num(rc[0], 8, 120, 30), D:num(rc[1], 5, 120, 15), H:num(rc[2], 8, 120, 28), kg: box ? 15 : 8 };
+  }
+  return { store:"", summary:String(r.m ?? ""), items, container:c,
+           warnings:(Array.isArray(r.w) ? r.w : []).map(String).filter(Boolean).slice(0, 6) };
+}
+
+// images: Blob[]（レシート → 袋・箱の順）
+async function analyze({ images, nReceipts, hasBox, signal, onText }){
+  const raw = await sample.json(buildPrompt(nReceipts, hasBox), { images, signal, onText });
+  return normalize(raw);
+}
+
+const ERR = {
+  not_granted:"Claudeの利用が許可されなかったため、解析できません。",
+  sampling_disabled:"このアカウントではClaudeを利用できません。",
+  rate_limited:"混み合っています。少し待ってから、もう一度押してください。",
+  image_rejected:"写真を読み込めませんでした。JPEGかPNGの別の写真を選んでください。",
+  images_unavailable:"この環境では写真を送れません。",
+  invalid_json:"結果をうまく読み取れませんでした。もう一度押してください。",
+  refused:"この写真は解析できませんでした。別の写真でお試しください。",
+  session_expired:"ログインが切れています。Claudeにログインし直してください。",
+  empty_completion:"結果が空でした。レシートの写真を撮り直してお試しください。"
+};
+const errorMessage = code => ERR[code] || "解析に失敗しました。通信状況を確認して、もう一度押してください。";
+
+App.ai = { init, analyze, errorMessage };
+})(window.App = window.App || {});
