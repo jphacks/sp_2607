@@ -15,7 +15,8 @@ src/
     image-prep.js   写真を軽くする（切り抜き・白黒化・縮小）
     ai.js           Claudeへの問い合わせ（指示文と返答の読み取り）
     packing.js      袋詰めの計算（画面には触らない）
-    scene3d.js      3D表示（Three.js）
+    models.js       商品の種類ごとの3Dモデル（紙パック・ペットボトル・卵パックなど）
+    scene3d.js      3D表示（Three.js）。袋・箱を描き、商品を置いた向きに回して並べる
     ui.js           画面の操作と表示
     main.js         起動
 build.ps1           src/ を1つのHTMLにまとめる
