@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- artifact:begin -->
+<title>袋づめ名人</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+        <path d="M8 16 L36 16 L33 40 L11 40 Z" fill="var(--accent)" />
+        <path d="M15 16 C15 8 20 6 22 11 C24 6 29 8 29 16" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="22" cy="13" r="2.6" fill="var(--ink)"/>
+      </svg>
+      <h1>袋づめ名人</h1>
+    </div>
+    <p class="tag">レシートを撮るだけ。買った物をどの順で、どの袋に詰めればいいか、3Dで先に見せます。</p>
+  </header>
+
+  <form class="intake" id="intake" autocomplete="off">
+    <div class="col">
+      <div class="field">
+        <span class="label">1　レシート</span>
+        <label class="dropzone" id="dzReceipt">
+          <input type="file" id="receiptInput" accept="image/jpeg,image/png,image/webp" multiple>
+          <svg class="receiptico" viewBox="0 0 26 34" aria-hidden="true"><path d="M2 1h22v31l-3.7-2.4-3.6 2.4-3.7-2.4-3.7 2.4-3.6-2.4L2 32z" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.5"/><path d="M6 8h14M6 13h10M6 18h14M6 23h8" stroke="var(--muted)" stroke-width="1.5"/></svg>
+          <strong>レシートを撮る / 選ぶ</strong>
+          <span>商品名が全部写るように。長いレシートは2〜3枚に分けてOK</span>
+        </label>
+        <div class="thumbs" id="receiptThumbs"></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="field">
+        <span class="label">2　詰める袋・箱</span>
+        <div id="containerSeg"></div>
+        <label class="dropzone small" id="dzBox">
+          <input type="file" id="boxInput" accept="image/jpeg,image/png,image/webp">
+          <span><strong style="color:var(--ink);font-size:14px">袋・箱の写真から測る（任意）</strong><br>レシートを横に置いて撮ると、レシートの幅をものさしにして大きさを測ります</span>
+        </label>
+        <div class="thumbs" id="boxThumbs"></div>
+      </div>
+      <div class="go">
+        <button type="submit" class="btn" id="goBtn" disabled>詰め方を考える</button>
+        <button type="button" class="btn ghost" id="stopBtn" hidden>止める</button>
+        <span class="status" id="status" role="status">レシートを選ぶと解析できます</span>
+      </div>
+    </div>
+  </form>
+
+  <div class="banner" id="banner"><b>表示中：サンプル</b><span>スーパーで12点買った例です。レシートを送ると、あなたの買い物に置き換わります。</span></div>
+
+  <div class="head">
+    <span class="store" id="store"></span>
+    <p class="summary" id="summary"></p>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="main">
+    <div class="viewer">
+      <div class="stage" id="stage">
+        <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
+        <div class="bagtags" id="bagtags"></div>
+        <div class="hint">ドラッグで回転・ホイールで拡大</div>
+      </div>
+      <div class="controls">
+        <button type="button" class="ctl" id="prevBtn" aria-label="前の手順">◀</button>
+        <button type="button" class="ctl play" id="playBtn">最初から再生</button>
+        <button type="button" class="ctl" id="nextBtn" aria-label="次の手順">▶</button>
+        <span class="stepnow" id="stepnow"></span>
+      </div>
+    </div>
+    <div>
+      <h2 class="label" style="margin-bottom:10px">詰める順番</h2>
+      <ol class="steps" id="steps"></ol>
+    </div>
+  </div>
+
+  <section>
+    <h2>買った物</h2>
+    <p class="lead">数字を直すと、すぐに詰め直します。「推測」の付いた商品は、レシートから特定しきれなかった物です。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>商品</th><th>個数</th><th>1個のサイズ（cm）</th><th>重さ（kg）</th><th>扱い</th></tr></thead>
+        <tbody id="itemRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="warnSec">
+    <h2>気をつけること</h2>
+    <ul class="warns" id="warnList"></ul>
+  </section>
+
+  <footer>商品のサイズと重さはAIによる目安です。袋の耐荷重は一般的な目安（レジ袋 小3kg・中5kg・大8kg など）で計算しています。</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 読み込み順に意味がある：後のファイルは前のファイルの App.* を使う -->
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/sample-data.js"></script>
+<script src="js/image-prep.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/packing.js"></script>
+<script src="js/scene3d.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+<!-- artifact:end -->
+</body>
+</html>
