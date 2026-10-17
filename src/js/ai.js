@@ -3,6 +3,9 @@
 (function(App){
 "use strict";
 const { num } = App.util;
+const { KINDS } = App.config;
+// 指示文に入れる種類の一覧（例 "pk=紙パック飲料 pb=ペットボトル ..."）。config.js の KINDS と必ず同じになる
+const KIND_CODES = Object.entries(KINDS).map(([k, v]) => `${k}=${v.label}`).join(" ") + " 当てはまらなければ\"\"";
 
 let sample = null, imgLimits = null;
 
@@ -20,12 +23,13 @@ function buildPrompt(nR, hasBox){
   // 返答はキー名なしの配列にして、出力トークン（入力の5倍の単価）を減らす
   return `画像${nR}枚はレシート${nR > 1 ? "（分割撮影。重複行は1回だけ数える）" : ""}${hasBox ? "、最後の1枚は詰める袋か箱" : ""}。
 商品行ごとに1要素（値引き・袋代・小計・税・支払い行は除く）：
-[名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信]
+[名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信,種類]
 形 b=箱・パック c=缶・ボトル・カップ s=袋物・野菜・パン
 性質 F=つぶれやすい U=立てないとこぼれる 両方ならFU なければ""
 温度 f=冷凍 c=冷蔵 r=常温　分別 r=肉魚 x=洗剤など非食品 ""=なし　確信 1=特定できた 0=推測
+種類 ${KIND_CODES}
 ${hasBox ? "箱袋は内寸[幅,奥行,高さ(袋は持ち手の付け根まで),b=箱/g=袋]をレシート幅58/80mmやサイズ表記を物差しに推定。\n" : ""}JSONのみで返答：
-{"m":"詰め方の要点(30字以内)","c":${hasBox ? "[30,15,28,\"g\"]" : "null"},"i":[["卵10個パック",1,26,11,7,0.65,"b","F","c","",1]],"w":["注意(なければ空)"]}
+{"m":"詰め方の要点(30字以内)","c":${hasBox ? "[30,15,28,\"g\"]" : "null"},"i":[["卵10個パック",1,26,11,7,0.65,"b","F","c","",1,"eg"]],"w":["注意(なければ空)"]}
 レシートが無ければ i を空にし m に理由。`;
 }
 
@@ -34,7 +38,7 @@ function normalize(raw){
   const r = raw && typeof raw === "object" ? raw : {};
   const SHAPE = { b:"box", c:"cylinder", s:"soft" }, TEMP = { f:"frozen", c:"chilled", r:"room" }, SEP = { r:"raw", x:"chemical" };
   const items = (Array.isArray(r.i) ? r.i : []).filter(Array.isArray).slice(0, 60).map((a, i) => {
-    const [name, qty, w, d, h, kg, shape, flags, temp, sep, conf] = a;
+    const [name, qty, w, d, h, kg, shape, flags, temp, sep, conf, kind] = a;
     const f = String(flags ?? "").toUpperCase();
     return {
       id: "i" + i, receipt: "", tip: "",
@@ -46,7 +50,8 @@ function normalize(raw){
       fragile: f.includes("F"), upright: f.includes("U"),
       temp: TEMP[temp] || "room",
       separate: SEP[sep] || "none",
-      confident: Number(conf) !== 0
+      confident: Number(conf) !== 0,
+      kind: KINDS[kind] ? kind : ""
     };
   });
   let c = null;

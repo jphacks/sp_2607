@@ -29,5 +29,28 @@ const STEP_TEXT = {
   5:{ title:"日用品は別の袋に", detail:"洗剤などは食品と同じ袋に入れず、別の袋にまとめます。" }
 };
 
-App.config = { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf, STEP_TEXT };
+// 商品の種類。3Dで本物らしい形に描き分けるのに使う（models.js）。color は一覧の色見本にも使う
+// コードはAIが返す短い記号（ai.js の指示文にも同じ一覧を書いている）
+const KINDS = {
+  pk:{ label:"紙パック飲料",       color:"#2F7FD0" },
+  pb:{ label:"ペットボトル",       color:"#8CC8E8" },
+  gb:{ label:"瓶",                 color:"#4E7F3A" },
+  cn:{ label:"缶",                 color:"#A9B2B8" },
+  cp:{ label:"カップ",             color:"#E5503B" },
+  eg:{ label:"卵",                 color:"#EBD3A8" },
+  br:{ label:"パン",               color:"#D59A4E" },
+  sn:{ label:"袋菓子",             color:"#D8412F" },
+  vg:{ label:"袋入り野菜",         color:"#C78A3B" },
+  rv:{ label:"丸い野菜・果物",     color:"#6FA544" },
+  lv:{ label:"長い野菜",           color:"#4E9A3A" },
+  bn:{ label:"バナナ",             color:"#F2CF3A" },
+  mt:{ label:"肉・魚のトレー",     color:"#C9505C" },
+  tf:{ label:"豆腐・惣菜パック",   color:"#E9E3D0" },
+  fz:{ label:"冷凍食品",           color:"#3D7CC9" },
+  bx:{ label:"箱",                 color:"#E07A3F" },
+  pc:{ label:"詰め替えパウチ",     color:"#2BA39A" },
+  tx:{ label:"ティッシュ・紙製品", color:"#9AA7B0" }
+};
+
+App.config = { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf, STEP_TEXT, KINDS };
 })(window.App = window.App || {});

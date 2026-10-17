@@ -30,10 +30,16 @@
       <div class="field">
         <span class="label">1　レシート</span>
         <label class="dropzone" id="dzReceipt">
-          <input type="file" id="receiptInput" accept="image/jpeg,image/png,image/webp" multiple>
+          <input type="file" id="receiptInput" accept="image/*" multiple>
           <svg class="receiptico" viewBox="0 0 26 34" aria-hidden="true"><path d="M2 1h22v31l-3.7-2.4-3.6 2.4-3.7-2.4-3.7 2.4-3.6-2.4L2 32z" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.5"/><path d="M6 8h14M6 13h10M6 18h14M6 23h8" stroke="var(--muted)" stroke-width="1.5"/></svg>
           <strong>レシートを撮る / 選ぶ</strong>
           <span>商品名が全部写るように。長いレシートは2〜3枚に分けてOK</span>
+        </label>
+        <!-- スマホだけ表示：カメラを直接起動する -->
+        <label class="camera" id="camReceipt">
+          <input type="file" id="receiptCamera" accept="image/*" capture="environment">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          カメラでレシートを撮る
         </label>
         <div class="thumbs" id="receiptThumbs"></div>
       </div>
@@ -43,7 +49,7 @@
         <span class="label">2　詰める袋・箱</span>
         <div id="containerSeg"></div>
         <label class="dropzone small" id="dzBox">
-          <input type="file" id="boxInput" accept="image/jpeg,image/png,image/webp">
+          <input type="file" id="boxInput" accept="image/*">
           <span><strong style="color:var(--ink);font-size:14px">袋・箱の写真から測る（任意）</strong><br>レシートを横に置いて撮ると、レシートの幅をものさしにして大きさを測ります</span>
         </label>
         <div class="thumbs" id="boxThumbs"></div>
@@ -69,7 +75,7 @@
       <div class="stage" id="stage">
         <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
         <div class="bagtags" id="bagtags"></div>
-        <div class="hint">ドラッグで回転・ホイールで拡大</div>
+        <div class="hint"><span class="mouse">ドラッグで回転・ホイールで拡大</span><span class="touch">横になぞって回転・2本指で拡大</span></div>
       </div>
       <div class="controls">
         <button type="button" class="ctl" id="prevBtn" aria-label="前の手順">◀</button>
@@ -111,6 +117,7 @@
 <script src="js/image-prep.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/packing.js"></script>
+<script src="js/models.js"></script>
 <script src="js/scene3d.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

@@ -2,7 +2,7 @@
 (function(App){
 "use strict";
 const { $, el, fmt, reduceMotion } = App.util;
-const { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf } = App.config;
+const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
 const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
 let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null;
@@ -39,7 +39,7 @@ function wirePhotos(input, dz, key, thumbs, cap){
         setStatus("写真を軽くしています…");
         state[key].push(await App.imagePrep.prepImage(f, key === "receipts" ? "receipt" : "box"));
       }catch{
-        setStatus("この写真は読み込めませんでした。JPEGかPNGの写真を選んでください。", true); return;
+        setStatus("この写真は読み込めませんでした。別の写真を選ぶか、カメラで撮り直してください。", true); return;
       }
     }
     draw();
@@ -97,7 +97,7 @@ async function onSubmit(e){
       if(data.container){ state.photoContainer = data.container; state.containerId = "photo"; }
       renderAll();
       setStatus("できました。下の3Dで順番を確認してください");
-      $("banner").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
+      $("summary").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
     }
   }catch(err){
     if(err?.code === "cancelled") setStatus("止めました");
@@ -145,14 +145,18 @@ function flagsOf(it){
 // 買った物の一覧。数字を直すと renderPack() で詰め直す（一覧自体は作り直さないので入力中のフォーカスが外れない）
 function renderTable(){
   const tb = $("itemRows"); tb.textContent = "";
-  const colorOf = new Map(state.data.items.map((it, i) => [it.id, PALETTE[i % PALETTE.length]]));
+  const colorOf = new Map(state.data.items.map((it, i) => [it.id, App.packing.colorFor(it, i)]));
   state.data.items.forEach((it, idx) => {
     const tr = el("tr");
-    const nameTd = el("td");
+    // class と data-label はスマホでカード表示にするときに使う（styles.css）
+    const cell = (cls, label) => { const td = el("td", cls); td.dataset.label = label; return td; };
+    const nameTd = cell("c-name", "");
     const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = colorOf.get(it.id); c.append(sw, it.name);
     nameTd.append(c);
     if(!it.confident) nameTd.append(el("span", "guess", "推測"));
-    if(it.receipt) nameTd.append(el("span", "rc", it.receipt));
+    const kindLabel = KINDS[it.kind]?.label;
+    const sub = [kindLabel, it.receipt].filter(Boolean).join("・");
+    if(sub) nameTd.append(el("span", "rc", sub));
     const numIn = (key, cls, step, label) => {
       const inp = document.createElement("input"); inp.type = "number"; inp.id = `f-${key}-${idx}`; inp.className = cls || "";
       inp.min = "0"; inp.step = step; inp.value = String(it[key]); inp.setAttribute("aria-label", `${it.name}の${label}`);
@@ -165,12 +169,12 @@ function renderTable(){
       });
       return inp;
     };
-    const qTd = el("td"); qTd.append(numIn("qty", "q", "1", "個数"));
-    const dTd = el("td"); const dims = el("div", "dims");
+    const qTd = cell("c-qty", "個数"); qTd.append(numIn("qty", "q", "1", "個数"));
+    const dTd = cell("c-dims", "1個のサイズ（幅×奥行き×高さ cm）"); const dims = el("div", "dims");
     dims.append(numIn("w", "", "0.5", "幅"), "×", numIn("d", "", "0.5", "奥行き"), "×", numIn("h", "", "0.5", "高さ"));
     dTd.append(dims);
-    const kTd = el("td"); kTd.append(numIn("kg", "", "0.05", "重さ"));
-    const fTd = el("td");
+    const kTd = cell("c-kg", "重さ（kg）"); kTd.append(numIn("kg", "", "0.05", "重さ"));
+    const fTd = cell("c-flags", "");
     flagsOf(it).forEach(([t, cls]) => fTd.append(el("span", "flag" + (cls ? " " + cls : ""), t)));
     if(it.tip) fTd.append(el("div", "tip", it.tip));
     tr.append(nameTd, qTd, dTd, kTd, fTd);
@@ -245,6 +249,7 @@ function renderAll(){ renderContainerSeg(); renderTable(); renderPack(); }
 async function start(){
   App.scene3d.init($("cv"), $("stage"));
   wirePhotos($("receiptInput"), $("dzReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
+  wirePhotos($("receiptCamera"), $("camReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
   wirePhotos($("boxInput"), $("dzBox"), "boxPhoto", "boxThumbs", () => 1);
   $("intake").addEventListener("submit", onSubmit);
   $("stopBtn").onclick = () => ctl?.abort();
@@ -252,8 +257,8 @@ async function start(){
   renderAll();
 
   const ai = await App.ai.init();
+  // 写真は image-prep.js で必ずJPEGに変換してから送るので、iPhoneのHEICなども選べるよう accept は image/* のままにする
   aiReady = ai.available; imgLimits = ai.imgLimits;
-  if(imgLimits){ const acc = imgLimits.mediaTypes.join(","); $("receiptInput").accept = acc; $("boxInput").accept = acc; }
   syncGo();
 }
 

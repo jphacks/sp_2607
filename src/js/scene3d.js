@@ -23,17 +23,39 @@ function init(canvas, stageEl){
   root = new THREE.Group(); scene.add(root);
   new ResizeObserver(resize).observe(stage);
 
-  // ドラッグで回転（タッチは横方向だけ。縦はページのスクロールに譲る）、ホイールで拡大
-  let drag = null;
-  stage.addEventListener("pointerdown", e => { drag = { x:e.clientX, y:e.clientY }; stage.setPointerCapture(e.pointerId); });
-  stage.addEventListener("pointermove", e => {
-    if(!drag) return;
-    view.rotY -= (e.clientX - drag.x) * 0.01;
-    if(e.pointerType === "mouse") view.tilt = Math.min(1.35, Math.max(0.05, view.tilt + (e.clientY - drag.y) * 0.008));
-    drag = { x:e.clientX, y:e.clientY };
+  // マウス：ドラッグで回転と傾き、ホイールで拡大
+  // 指：1本で横になぞると回転（縦はページのスクロールに譲る）、2本でつまむと拡大・縮小、2本で上下になぞると傾き
+  const clampDist = v => Math.min(view.base * 2.5, Math.max(view.base * 0.4, v));
+  const pts = new Map();
+  let pinch = null;
+  const pinchState = () => {
+    const [a, b] = [...pts.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, y: (a.y + b.y) / 2 };
+  };
+  stage.addEventListener("pointerdown", e => {
+    pts.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    stage.setPointerCapture(e.pointerId);
+    if(pts.size === 2){ const s = pinchState(); pinch = { d0:s.d, y0:s.y, dist0:view.dist, tilt0:view.tilt }; }
   });
-  ["pointerup","pointercancel"].forEach(ev => stage.addEventListener(ev, () => drag = null));
-  stage.addEventListener("wheel", e => { e.preventDefault(); view.dist = Math.min(view.base * 2.5, Math.max(view.base * 0.4, view.dist * (1 + e.deltaY * 0.001))); }, { passive:false });
+  stage.addEventListener("pointermove", e => {
+    const prev = pts.get(e.pointerId);
+    if(!prev) return;
+    const cur = { x:e.clientX, y:e.clientY };
+    pts.set(e.pointerId, cur);
+    if(pts.size >= 2 && pinch){
+      const s = pinchState();
+      view.dist = clampDist(pinch.dist0 * pinch.d0 / s.d);
+      view.tilt = Math.min(1.35, Math.max(0.05, pinch.tilt0 + (s.y - pinch.y0) * 0.008));
+      return;
+    }
+    view.rotY -= (cur.x - prev.x) * 0.01;
+    if(e.pointerType === "mouse") view.tilt = Math.min(1.35, Math.max(0.05, view.tilt + (cur.y - prev.y) * 0.008));
+  });
+  ["pointerup","pointercancel","lostpointercapture"].forEach(ev => stage.addEventListener(ev, e => {
+    pts.delete(e.pointerId);
+    if(pts.size < 2) pinch = null;
+  }));
+  stage.addEventListener("wheel", e => { e.preventDefault(); view.dist = clampDist(view.dist * (1 + e.deltaY * 0.001)); }, { passive:false });
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
   new MutationObserver(retheme).observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
@@ -47,7 +69,7 @@ function resize(){
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
 }
-function disposeAll(){ root.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); }); root.clear(); meshes = []; }
+function disposeAll(){ root.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose?.(); }); root.clear(); meshes = []; }
 function retheme(){ if(ready && root) root.traverse(o => { if(o.userData.themed) o.material.color = cssColor(o.userData.themed); }); }
 
 // レジ袋：半透明の袋＋持ち手。点線は「ここまで詰めてOK」の高さ。戻り値は描いた物の一番上
@@ -91,20 +113,53 @@ function addBox(g, C){
   return H + f;
 }
 
-function itemGeometry(p){
-  const k = 0.95;
-  if(p.shape === "cylinder"){
-    // 円柱の軸は、いちばん長い辺の向きに合わせる
-    const axis = [p.w, p.h, p.d].indexOf(Math.max(p.w, p.h, p.d));
-    const len = Math.max(p.w, p.h, p.d) * k;
-    const geo = new THREE.CylinderGeometry(1, 1, 1, 28);
-    if(axis === 1) geo.scale(p.w / 2 * k, p.h * k, p.d / 2 * k);
-    else if(axis === 0){ geo.rotateZ(Math.PI / 2); geo.scale(len, p.h / 2 * k, p.d / 2 * k); }
-    else { geo.rotateX(Math.PI / 2); geo.scale(p.w / 2 * k, p.h / 2 * k, len); }
-    return geo;
-  }
-  if(p.shape === "soft"){ const geo = new THREE.SphereGeometry(1, 24, 16); geo.scale(p.w / 2 * k, p.h / 2 * k, p.d / 2 * k); return geo; }
-  return new THREE.BoxGeometry(p.w * k, p.h * k, p.d * k);
+// 置いた向き（packing.js の orientations() の番号）ごとの回転。
+// モデルは「普通に置いた向き」で作るので、inner を先に回し、outer で横に回して、置いた向きに合わせる
+//   0 そのまま / 1 横に90° / 2〜5 寝かせる
+const ROT = [
+  { ix:0,           iz:0,           oy:0 },
+  { ix:0,           iz:0,           oy:Math.PI / 2 },
+  { ix:Math.PI / 2, iz:0,           oy:0 },
+  { ix:Math.PI / 2, iz:0,           oy:Math.PI / 2 },
+  { ix:0,           iz:Math.PI / 2, oy:Math.PI / 2 },
+  { ix:0,           iz:Math.PI / 2, oy:0 }
+];
+
+// 1個の商品を組み立てる：holder（位置・落下アニメ）→ wrap（袋に合わせて縮める）→ outer → inner（向き）→ モデル
+function itemObject(p){
+  const [w, h, d] = p.dims;
+  const model = App.models.build(p.kind, p.shape, w, h, d, p.color);
+  const inner = new THREE.Group(); inner.add(model);
+  const r = ROT[p.o] || ROT[0];
+  inner.rotation.set(r.ix, 0, r.iz);
+  const outer = new THREE.Group(); outer.add(inner); outer.rotation.y = r.oy;
+  // 少しだけ小さくして、隣の商品とくっついて見えないようにする
+  const k = 0.95, [ra, rb, rh] = p.raw;
+  const wrap = new THREE.Group(); wrap.add(outer); wrap.scale.set(p.w / ra * k, p.h / rh * k, p.d / rb * k);
+  const holder = new THREE.Group(); holder.add(wrap); holder.position.set(p.x, p.y, p.z);
+  const mats = [];
+  model.traverse(o => { if(o.material?.emissive) mats.push(o.material); });
+  return { holder, mats };
+}
+
+// 商品名の札（常にカメラの方を向く板）
+function makeLabel(text, worldH){
+  const fs = 44, pad = 14, c = document.createElement("canvas"), g = c.getContext("2d");
+  const font = `700 ${fs}px "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif`;
+  g.font = font;
+  const tw = Math.ceil(g.measureText(text).width);
+  c.width = tw + pad * 2; c.height = fs + pad * 2;
+  g.font = font;
+  g.fillStyle = "rgba(28,36,32,0.88)";
+  const rr = 16; g.beginPath();
+  g.moveTo(rr, 0); g.arcTo(c.width, 0, c.width, c.height, rr); g.arcTo(c.width, c.height, 0, c.height, rr);
+  g.arcTo(0, c.height, 0, 0, rr); g.arcTo(0, 0, c.width, 0, rr); g.fill();
+  g.fillStyle = "#FFFFFF"; g.textBaseline = "middle"; g.fillText(text, pad, c.height / 2 + 2);
+  const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true }));
+  sp.scale.set(worldH * c.width / c.height, worldH, 1);
+  sp.renderOrder = 10;
+  return sp;
 }
 
 // packed: packing.pack() の結果、steps: packing.buildSteps() の結果
@@ -119,12 +174,18 @@ function show(packedResult, steps){
     const g = new THREE.Group(); g.position.x = -span / 2 + C.W / 2 + b * (C.W + gap); root.add(g);
     topY = C.kind === "box" ? addBox(g, C) : addBag(g, C);
   }
+  const labelH = Math.max(2.2, C.W * 0.085);
   placed.forEach(p => {
-    const geo = itemGeometry(p);
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color:new THREE.Color(p.color), roughness:p.shape === "soft" ? 0.95 : 0.55 }));
-    m.position.set(p.x, p.y, p.z); root.children[p.bag].add(m);
-    if(p.shape !== "soft") m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color:0x000000, transparent:true, opacity:0.25 })));
-    meshes.push({ m, step: steps.findIndex(s => s.rank === p.rank), y:p.y, t0:0 });
+    const { holder, mats } = itemObject(p);
+    root.children[p.bag].add(holder);
+    let label = null;
+    if(p.first){
+      label = makeLabel(p.name, labelH);
+      label.position.set(0, p.h / 2 + labelH * 0.8, 0);
+      label.visible = false;
+      holder.add(label);
+    }
+    meshes.push({ m:holder, mats, label, step: steps.findIndex(s => s.rank === p.rank), y:p.y, t0:0 });
   });
   view.target = new THREE.Vector3(0, topY * 0.42, 0);
   view.base = Math.max(span * 1.25, topY * 2.2) + 15;
@@ -139,6 +200,8 @@ function setStep(k, animate){
   const now = performance.now(), drop = packed ? packed.C.H : 30;
   for(const o of meshes){
     o.m.visible = o.step <= k;
+    // 名前の札は、いま入れる手順の商品にだけ出す（全部出すと重なって読めない）
+    if(o.label) o.label.visible = o.step === k;
     if(animate && !reduceMotion && o.step === k){ o.t0 = now; o.m.position.y = o.y + drop; }
     else if(!o.t0) o.m.position.y = o.y;
   }
@@ -162,7 +225,7 @@ function loop(now){
       if(k >= 1) o.t0 = 0;
     }
     const cur = o.step === curStep;
-    o.m.material.emissive.setRGB(cur ? 0.18 : 0, cur ? 0.15 : 0, cur ? 0.05 : 0);
+    for(const m of o.mats) m.emissive.setRGB(cur ? 0.12 : 0, cur ? 0.1 : 0, cur ? 0.03 : 0);
   }
   renderer.render(scene, camera);
 }
