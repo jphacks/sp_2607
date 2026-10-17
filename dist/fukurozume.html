@@ -96,7 +96,14 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);lin
 .ctl{font:inherit;font-size:14px;min-width:40px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--ground);color:var(--ink);cursor:pointer}
 .ctl.play{background:var(--ink);color:var(--ground);border-color:var(--ink);font-weight:700}
 .stepnow{flex:1;font-size:13px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.ctl.voice{display:inline-flex;align-items:center;gap:5px}
+.ctl.voice[hidden]{display:none}
+.ctl.voice svg{width:20px;height:20px}
+.ctl.voice[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ctl.voice[aria-pressed="true"] .mute, .ctl.voice[aria-pressed="false"] .wave{display:none}
+.ctl.voice[aria-pressed="false"]{color:var(--muted)}
 
+.steps-lead{margin:0 0 10px;font-size:13px;color:var(--muted)}
 .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .stepbtn{width:100%;text-align:left;font:inherit;color:inherit;display:grid;grid-template-columns:36px 1fr;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
 .stepbtn[aria-current="step"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -128,16 +135,82 @@ td input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .warns{margin:0;padding-left:1.2em;color:var(--muted);font-size:14px}
 footer{font-size:12px;color:var(--muted)}
 
-/* カメラ起動ボタン（指で操作する端末だけ表示） */
-.camera{position:relative;display:none;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 16px;border-radius:10px;background:var(--ink);color:var(--ground);font-weight:700;cursor:pointer}
-.camera svg{width:22px;height:22px}
-.camera input{position:absolute;opacity:0;width:1px;height:1px}
-.camera:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+/* マイバッグ */
+.mybag{display:inline-flex;align-items:stretch}
+.seg .mybag > button:first-child{border-radius:999px 0 0 999px;border-right:0}
+.seg .mybag > button.del{border-radius:0 999px 999px 0;padding:6px 10px;color:var(--muted);font-size:13px}
+.seg .mybag > button.del.armed{background:var(--warn);border-color:var(--warn);color:#fff}
+.seg button.add{border-style:dashed;color:var(--muted)}
+.seg button.add:hover{color:var(--ink);border-color:var(--ink)}
+.bagform{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:var(--sunk);border:1px solid var(--line)}
+.bf-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.bf-field label{font-size:12px;font-weight:700;color:var(--muted)}
+.bagform input{font:inherit;font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--ground);color:var(--ink);width:100%}
+.bagform input[type="number"]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bagform input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.bf-dims{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.bf-hint{margin:0;font-size:12px;color:var(--muted)}
+.bf-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.bf-actions .btn{font-size:15px;padding:10px 18px}
+.bf-msg{font-size:13px;color:var(--muted)}
+.bf-msg.err{color:var(--warn)}
+
+/* 開いて最初に押す「レシートを撮る」ボタン */
+.start{display:flex;flex-direction:column;align-items:center;gap:6px}
+.shoot{position:relative;display:flex;align-items:center;justify-content:center;gap:16px;width:100%;max-width:560px;min-height:88px;padding:16px 24px;border-radius:18px;background:var(--accent);color:var(--accent-ink);cursor:pointer;box-shadow:0 5px 0 #B8930C;transition:transform .08s,box-shadow .08s}
+.shoot:hover{filter:brightness(1.03)}
+.shoot:active{transform:translateY(3px);box-shadow:0 2px 0 #B8930C}
+.shoot:focus-within{outline:3px solid var(--ink);outline-offset:3px}
+.shoot input{position:absolute;opacity:0;width:1px;height:1px}
+.shoot svg{width:44px;height:44px;flex:none}
+.shoot-text{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.shoot-main{font-family:var(--display);font-size:clamp(24px,6vw,30px);line-height:1.15;letter-spacing:.04em}
+.shoot-sub{font-size:13px;font-weight:500;opacity:.8}
+.start-links{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px}
+.pick{position:relative;font:inherit;font-size:14px;color:var(--muted);background:none;border:0;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:10px 12px}
+.pick:hover{color:var(--ink)}
+.pick:focus-visible,.pick:focus-within{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.pick input{position:absolute;opacity:0;width:1px;height:1px}
+
+/* 開いた直後の画面：アプリ名と大きなボタンだけを、画面の真ん中に出す */
+.wrap.intro{min-height:100vh;min-height:100dvh;justify-content:center;align-items:center;text-align:center;gap:40px;padding-block:32px}
+.wrap.intro > *:not(header):not(.start){display:none}
+.wrap.intro header{flex-direction:column;align-items:center;gap:14px}
+.wrap.intro .brand{flex-direction:column;gap:12px}
+.wrap.intro .logo{width:72px;height:72px}
+.wrap.intro h1{font-size:clamp(36px,10vw,52px)}
+.wrap.intro .tag{font-size:15px;max-width:22em}
+.wrap.intro .start{width:100%;gap:14px}
+.wrap.intro .shoot{min-height:132px;max-width:420px;flex-direction:column;gap:10px;padding:22px 24px;border-radius:24px}
+.wrap.intro .shoot svg{width:56px;height:56px}
+.wrap.intro .shoot-text{align-items:center}
+.wrap.intro .shoot-sub{display:none}
+
+/* 最初の画面の「使うバッグ」 */
+.bagpick{display:none}
+.wrap.intro .bagpick{display:flex;flex-direction:column;gap:10px;width:100%;max-width:420px;text-align:left;padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.bp-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bp-toggle{padding:6px 4px}
+.bp-now{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.bp-now b{font-size:18px;font-weight:700}
+.bp-now span{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bp-list{display:flex;flex-direction:column;gap:10px;padding-top:4px;border-top:1px solid var(--line)}
+.bp-list[hidden]{display:none}
+.bp-list .seggroup:first-child{margin-top:8px}
+
+/* 撮ったあとの画面：レシートの確認と、袋・箱の選択だけを出す */
+.wrap.setup > *:not(header):not(.intake){display:none}
+.wrap.setup .tag{display:none}
+.wrap.setup .intake{grid-template-columns:1fr}
+.wrap.setup .go{flex-direction:column;align-items:stretch}
+.wrap.setup #goBtn{min-height:60px;font-size:19px;border-radius:14px;box-shadow:0 4px 0 #B8930C}
+.wrap.setup #goBtn:disabled{box-shadow:none}
+.setup-back{display:none}
+.wrap.setup .setup-back{display:inline-block;align-self:center}
 .hint .touch{display:none}
 
 /* ---------- 指で操作する端末 ---------- */
 @media (pointer:coarse){
-  .camera{display:flex}
   .hint .mouse{display:none}
   .hint .touch{display:inline}
   .seg button{min-height:44px;padding:8px 14px}
@@ -146,7 +219,8 @@ footer{font-size:12px;color:var(--muted)}
   .thumb button{width:30px;height:30px;font-size:15px}
   .stepbtn{padding:14px}
   /* 16px未満だとiPhoneが入力時に画面を拡大してしまう */
-  input[type="number"], td input[type="number"]{font-size:16px}
+  input[type="number"], td input[type="number"], .bagform input{font-size:16px}
+  .seg .mybag > button.del{min-width:40px}
 }
 
 /* ---------- タブレット・スマホ ---------- */
@@ -163,6 +237,7 @@ footer{font-size:12px;color:var(--muted)}
   .intake{padding:16px;gap:20px}
   .dropzone{min-height:104px}
   .go .btn:not(.ghost){flex:1 1 100%}
+  .bf-dims{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stats{gap:8px 22px}
   .stat .v{font-size:19px}
   .controls{padding:8px 10px}
@@ -188,7 +263,8 @@ footer{font-size:12px;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 
-<div class="wrap">
+<!-- 画面は3段階：intro（「レシートを撮る」だけ）→ setup（レシートの確認と袋・箱の選択）→ クラスなし（結果） -->
+<div class="wrap intro" id="app">
   <header>
     <div class="brand">
       <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
@@ -201,6 +277,34 @@ footer{font-size:12px;color:var(--muted)}
     <p class="tag">レシートを撮るだけ。買った物をどの順で、どの袋に詰めればいいか、3Dで先に見せます。</p>
   </header>
 
+  <!-- 開いて最初に押すボタン。スマホではカメラが直接起動する -->
+  <div class="start">
+    <!-- 最初の画面で使うバッグを決める（ふつうの画面では、下の「2 詰める袋・箱」で選ぶ） -->
+    <div class="bagpick">
+      <div class="bp-head">
+        <span class="label">使うバッグ</span>
+        <button type="button" class="pick bp-toggle" id="bpToggle" aria-expanded="false" aria-controls="introBagList">変更する</button>
+      </div>
+      <div class="bp-now" id="bpNow"></div>
+      <div class="bp-list" id="introBagList" hidden></div>
+    </div>
+    <label class="shoot" id="heroCam">
+      <input type="file" id="receiptCamera" accept="image/*" capture="environment">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5h3.6l2-3h5.8l2 3h3.6v12h-17z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.9" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>
+      <span class="shoot-text">
+        <span class="shoot-main">レシートを撮る</span>
+        <span class="shoot-sub">撮ったら袋・箱を選んで「詰め方を考える」</span>
+      </span>
+    </label>
+    <div class="start-links">
+      <label class="pick" id="heroPick">
+        <input type="file" id="receiptPick" accept="image/*" multiple>
+        保存してある写真から選ぶ
+      </label>
+      <button type="button" class="pick" id="skipIntro">サンプルを見る</button>
+    </div>
+  </div>
+
   <form class="intake" id="intake" autocomplete="off">
     <div class="col">
       <div class="field">
@@ -211,12 +315,6 @@ footer{font-size:12px;color:var(--muted)}
           <strong>レシートを撮る / 選ぶ</strong>
           <span>商品名が全部写るように。長いレシートは2〜3枚に分けてOK</span>
         </label>
-        <!-- スマホだけ表示：カメラを直接起動する -->
-        <label class="camera" id="camReceipt">
-          <input type="file" id="receiptCamera" accept="image/*" capture="environment">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-          カメラでレシートを撮る
-        </label>
         <div class="thumbs" id="receiptThumbs"></div>
       </div>
     </div>
@@ -224,6 +322,29 @@ footer{font-size:12px;color:var(--muted)}
       <div class="field">
         <span class="label">2　詰める袋・箱</span>
         <div id="containerSeg"></div>
+        <!-- マイバッグの登録フォーム（「＋ マイバッグを登録」で開く） -->
+        <div class="bagform" id="bagForm" hidden>
+          <div class="bf-field">
+            <label for="bfName">名前</label>
+            <input type="text" id="bfName" maxlength="20" placeholder="例：いつものエコバッグ">
+          </div>
+          <div class="seg" id="bfKind" role="group" aria-label="袋か箱か">
+            <button type="button" data-v="bag" aria-pressed="true">袋</button>
+            <button type="button" data-v="box" aria-pressed="false">箱</button>
+          </div>
+          <div class="bf-dims">
+            <div class="bf-field"><label for="bfW">幅 cm</label><input type="number" id="bfW" min="5" max="150" step="0.5" inputmode="decimal"></div>
+            <div class="bf-field"><label for="bfD">奥行き cm</label><input type="number" id="bfD" min="3" max="150" step="0.5" inputmode="decimal"></div>
+            <div class="bf-field"><label for="bfH">高さ cm</label><input type="number" id="bfH" min="5" max="150" step="0.5" inputmode="decimal"></div>
+            <div class="bf-field"><label for="bfKg">耐荷重 kg</label><input type="number" id="bfKg" min="1" max="50" step="0.5" inputmode="decimal"></div>
+          </div>
+          <p class="bf-hint" id="bfHint">袋は、底から持ち手の付け根までの高さを測ってください。</p>
+          <div class="bf-actions">
+            <button type="button" class="btn" id="bfSave">保存する</button>
+            <button type="button" class="btn ghost" id="bfCancel">やめる</button>
+            <span class="bf-msg" id="bfMsg" role="status"></span>
+          </div>
+        </div>
         <label class="dropzone small" id="dzBox">
           <input type="file" id="boxInput" accept="image/*">
           <span><strong style="color:var(--ink);font-size:14px">袋・箱の写真から測る（任意）</strong><br>レシートを横に置いて撮ると、レシートの幅をものさしにして大きさを測ります</span>
@@ -234,6 +355,7 @@ footer{font-size:12px;color:var(--muted)}
         <button type="submit" class="btn" id="goBtn" disabled>詰め方を考える</button>
         <button type="button" class="btn ghost" id="stopBtn" hidden>止める</button>
         <span class="status" id="status" role="status">レシートを選ぶと解析できます</span>
+        <button type="button" class="pick setup-back" id="showSample">先にサンプルを見る</button>
       </div>
     </div>
   </form>
@@ -257,11 +379,16 @@ footer{font-size:12px;color:var(--muted)}
         <button type="button" class="ctl" id="prevBtn" aria-label="前の手順">◀</button>
         <button type="button" class="ctl play" id="playBtn">最初から再生</button>
         <button type="button" class="ctl" id="nextBtn" aria-label="次の手順">▶</button>
+        <button type="button" class="ctl voice" id="voiceBtn" aria-pressed="true" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>音声</span>
+        </button>
         <span class="stepnow" id="stepnow"></span>
       </div>
     </div>
     <div>
-      <h2 class="label" style="margin-bottom:10px">詰める順番</h2>
+      <h2 class="label" style="margin-bottom:4px">詰める順番</h2>
+      <p class="steps-lead">かごの上の方（レシートの下の方）にある商品から、なるべく順に取り出せる並びにしています。</p>
       <ol class="steps" id="steps"></ol>
     </div>
   </div>
@@ -333,14 +460,14 @@ const PRESETS = [
 ];
 const DEFAULT_CONTAINER = "rl";
 
-const nameOf = c => c.id === "photo" ? c.label : c.id === "eco" ? "エコバッグ" : c.group + " " + c.label + (c.kind === "box" ? "サイズ" : "");
+const nameOf = c => c.id === "photo" || c.group === "マイバッグ" ? c.label : c.id === "eco" ? "エコバッグ" : c.group + " " + c.label + (c.kind === "box" ? "サイズ" : "");
 
 // 1 重い・立てる物 → 2 箱物 → 3 軽い物 → 4 つぶれやすい物 → 5 日用品は別袋
 const STEP_TEXT = {
   1:{ title:"重い物・立てる物を底に", detail:"飲み物や缶詰など重い物を底に並べます。紙パックは立てて角に寄せると倒れません。" },
   2:{ title:"箱やパックで面をそろえる", detail:"箱物・トレーを平らに積んで、上に物を置ける面を作ります。" },
   3:{ title:"軽い物で隙間を埋める", detail:"野菜の袋や軽い物を、空いている隙間に入れます。" },
-  4:{ title:"つぶれやすい物を一番上に", detail:"卵・パン・お菓子は最後に、上にそっと置きます。" },
+  4:{ title:"つぶれやすい物を一番上に", detail:"卵・パン・お菓子は最後に、上にそっと置きます。この上には何も載せません。" },
   5:{ title:"日用品は別の袋に", detail:"洗剤などは食品と同じ袋に入れず、別の袋にまとめます。" }
 };
 
@@ -473,6 +600,97 @@ App.imagePrep = { prepImage };
 })(window.App = window.App || {});
 </script>
 <script>
+// マイバッグ（自分で登録した袋・箱）の保存
+// - claude.ai で開いたとき：アカウントの本人専用の保存場所（db の data/users/<自分のid>/bags）。スマホとPCで共有される
+// - それ以外（手元のファイル・GitHub Pages など）：この端末のブラウザ（localStorage）
+// - どちらも使えないとき：ページを閉じるまでだけ覚えておく
+(function(App){
+"use strict";
+
+const LOCAL_KEY = "fukurozume.mybags";
+const MAX_BAGS = 12;
+let mode = "memory";              // "cloud" | "local" | "memory"
+let ref = null;                   // cloud のときの保存先ドキュメント
+let data = { bags:[], last:"" };  // bags: [{ id, name, kind:"bag"|"box", W, D, H, kg }]、last: 最後に選んだ袋・箱のid
+let writing = Promise.resolve();
+const listeners = [];
+
+const num = (v, lo, hi, d) => App.util.num(v, lo, hi, d);
+function clean(raw){
+  const r = raw && typeof raw === "object" ? raw : {};
+  const bags = (Array.isArray(r.bags) ? r.bags : []).slice(0, MAX_BAGS).filter(b => b && typeof b.id === "string").map(b => ({
+    id: b.id, name: String(b.name || "マイバッグ").slice(0, 20), kind: b.kind === "box" ? "box" : "bag",
+    W: num(b.W, 5, 150, 35), D: num(b.D, 3, 150, 18), H: num(b.H, 5, 150, 30), kg: num(b.kg, 1, 50, 10)
+  }));
+  return { bags, last: typeof r.last === "string" ? r.last : "" };
+}
+function emit(){ for(const f of listeners) f(); }
+
+function readLocal(){ try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "null"); } catch { return null; } }
+function localWorks(){ try { localStorage.setItem(LOCAL_KEY + ".t", "1"); localStorage.removeItem(LOCAL_KEY + ".t"); return true; } catch { return false; } }
+
+async function init(){
+  try{
+    if(window.claude){
+      const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      const uid = user ? await user.id() : null;
+      if(db && uid){
+        ref = db.doc("data/users/" + uid + "/bags");
+        const snap = await ref.get();
+        if(snap.exists) data = clean(snap.data());
+        mode = "cloud";
+        // 別の端末で登録・削除したときも、この画面に反映する
+        ref.onSnapshot(s => { if(s.exists && !s.metadata.hasPendingWrites){ data = clean(s.data()); emit(); } }, () => {});
+      }
+    }
+  }catch{ ref = null; mode = "memory"; }
+  if(mode !== "cloud" && localWorks()){ mode = "local"; data = clean(readLocal()); }
+  emit();
+  return mode;
+}
+
+// 書き込みは1つずつ順番に（同じドキュメントへの同時書き込みを避ける）
+function persist(){
+  const body = { bags: data.bags.map(b => ({ ...b })), last: data.last };
+  if(mode === "cloud"){
+    const p = writing.then(() => ref.set(body));
+    writing = p.catch(() => {});
+    return p;
+  }
+  if(mode === "local"){ try { localStorage.setItem(LOCAL_KEY, JSON.stringify(body)); } catch {} }
+  return Promise.resolve();
+}
+
+const newId = () => "u_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// 戻り値: 保存した袋（id付き）。上限を超えるときは古いものから消す
+async function saveBag(bag){
+  const b = clean({ bags:[{ ...bag, id: bag.id || newId() }] }).bags[0];
+  const rest = data.bags.filter(x => x.id !== b.id);
+  data = { bags: [b, ...rest].slice(0, MAX_BAGS), last: b.id };
+  emit();
+  await persist();
+  return b;
+}
+async function removeBag(id){
+  data = { bags: data.bags.filter(b => b.id !== id), last: data.last === id ? "" : data.last };
+  emit();
+  await persist();
+}
+async function setLast(id){
+  if(data.last === id) return;
+  data = { bags: data.bags.map(b => ({ ...b })), last: id };
+  await persist();
+}
+
+App.bagStore = {
+  init, saveBag, removeBag, setLast,
+  bags: () => data.bags, last: () => data.last, mode: () => mode,
+  onChange: f => { listeners.push(f); }
+};
+})(window.App = window.App || {});
+</script>
+<script>
 // Claudeへの問い合わせ（レシートの読み取り）
 // 今は claude.ai の sample 機能を使う。API版にするときは analyze() の中身だけ差し替えればよい。
 (function(App){
@@ -497,7 +715,7 @@ async function init(){
 function buildPrompt(nR, hasBox){
   // 返答はキー名なしの配列にして、出力トークン（入力の5倍の単価）を減らす
   return `画像${nR}枚はレシート${nR > 1 ? "（分割撮影。重複行は1回だけ数える）" : ""}${hasBox ? "、最後の1枚は詰める袋か箱" : ""}。
-商品行ごとに1要素（値引き・袋代・小計・税・支払い行は除く）：
+商品行ごとに1要素、レシートの上から順に（値引き・袋代・小計・税・支払い行は除く）：
 [名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信,種類]
 形 b=箱・パック c=缶・ボトル・カップ s=袋物・野菜・パン
 性質 F=つぶれやすい U=立てないとこぼれる 両方ならFU なければ""
@@ -564,7 +782,8 @@ App.ai = { init, analyze, errorMessage };
 </script>
 <script>
 // 袋詰めの計算（画面には触らない）
-// 高さマップ方式：袋の底を格子に区切り、各マスの「今の高さ」を記録しながら、一番低く収まる位置に置いていく
+// 1. 入れる順番を決める：かごの上（レシートの下の方）から取り出しやすい順を基本に、詰め方のルールと折り合いをつける
+// 2. 置く場所を決める：高さマップ方式。袋の底を格子に区切り、各マスの「今の高さ」を記録しながら、一番低く収まる位置に置いていく
 (function(App){
 "use strict";
 const { PALETTE, STEP_TEXT, KINDS } = App.config;
@@ -581,27 +800,83 @@ function rankOf(it){
   return 2;
 }
 
-// 置き方の候補。立てる物は向きを変えない（横回転だけ）
+// 上に載せてよい重さ(kg)の上限。これを超える置き方は絶対にしない
+//   柔らかくてつぶれやすい物（パン・袋菓子・バナナなど）… 0（何も載せない）
+//   硬い容器のつぶれやすい物（卵パック・豆腐など）……… 0.15（ごく軽い物だけ）
+//   それ以外 …………………………………………………………… 上限なし
+const LIGHT_ON_FRAGILE = 0.15;
+function loadLimitOf(it){
+  const soft = it.shape === "soft";
+  if(it.fragile) return soft ? 0 : LIGHT_ON_FRAGILE;
+  if(soft && it.kg < 0.5) return 0;   // 葉物など、印が付いていなくても軽くて柔らかい物はつぶれる
+  return Infinity;
+}
+
+// 置き方の候補。立てる物と、つぶれやすい物は向きを変えない（横回転だけ）
 function orientations(it){
   const { w, d, h } = it;
-  if(it.upright) return [[w, d, h], [d, w, h]];
+  if(it.upright || it.fragile) return [[w, d, h], [d, w, h]];
   return [[w, d, h], [d, w, h], [w, h, d], [h, w, d], [d, h, w], [h, d, w]];
 }
 
-// items: 商品の配列、C: 袋・箱 { W, D, H, kg }
-// 戻り値: { C, bags, placed, colorOf, units }
+// ---------- 入れる順番 ----------
+// レジでは、スキャンした順に商品を新しいかごへ入れていく。だからレシートの下の方の商品ほど、かごの上にあって取り出しやすい。
+// 次に入れる商品は、次の点数の合計が一番小さい物にする（貪欲法）：
+//   かごの深さ  … その商品の上に、まだ残っている商品がいくつあるか（レシートの下の方なら0。上の方へ離れるほど大きい）
+//   ルール違反  … 同じ袋に入る物で、まだ入れていない「より下に入れるべき物」との段階の差の2乗の合計
+//                  （重い物より先に卵を入れる＝差3 → 9点、のように、ルールから大きく外れるほど急に重くなる）
+//   つぶれやすさ … つぶれやすい物は、同じ袋に入るつぶれない物が残っている限り後回し（レシート順より優先）。
+//                  つぶれやすい物どうしでは、硬い容器の物（卵など）を柔らかい物（パンなど）より先に
+// ルール違反の重みを大きめにしているので、重い物とつぶれやすい物の順番はほぼ守られ、近い段階どうしはレシート順が優先される。
+const DEPTH_WEIGHT = 1, RULE_WEIGHT = 3, CRUSH_WEIGHT = 30, SOFT_LAST_WEIGHT = 5;
+function orderUnits(units){
+  const rest = [...units], out = [];
+  while(rest.length){
+    let best = null, bestCost = Infinity;
+    for(const u of rest){
+      let depth = 0, rule = 0;
+      for(const v of rest){
+        if(v === u) continue;
+        if(v.pos > u.pos) depth++;
+        if(v.group !== u.group) continue;
+        if(v.rank < u.rank) rule += (u.rank - v.rank) ** 2;
+        if(u.lim < Infinity && v.lim === Infinity) rule += CRUSH_WEIGHT;
+        if(v.lim > u.lim && v.lim < Infinity) rule += SOFT_LAST_WEIGHT;
+      }
+      const cost = DEPTH_WEIGHT * depth + RULE_WEIGHT * rule;
+      // 同じ点数なら、大きい物を先に（隙間を小さい物で埋められるように）
+      if(cost < bestCost || (cost === bestCost && u.vol > best.vol)){ best = u; bestCost = cost; }
+    }
+    out.push(best);
+    rest.splice(rest.indexOf(best), 1);
+  }
+  // 同じ段階が続くところを1つの手順にまとめる
+  let step = -1, prev = null;
+  for(const u of out){ if(u.rank !== prev){ step++; prev = u.rank; } u.step = step; }
+  return out;
+}
+
+// ---------- 置く場所 ----------
+// items: 商品の配列（レシートの上から順）、C: 袋・箱 { W, D, H, kg }
+// 戻り値: { C, bags, placed, colorOf, units }  units は入れる順番に並んでいる
 function pack(items, C){
   const { W, D, H } = C;
   const cell = Math.max(W, D) < 40 ? 1.5 : 2;
   const nx = Math.max(1, Math.floor(W / cell)), nz = Math.max(1, Math.floor(D / cell));
   const colorOf = new Map(items.map((it, i) => [it.id, colorFor(it, i)]));
-  const units = [];
-  for(const it of items) for(let q = 0; q < it.qty && units.length < 80; q++)
-    units.push({ it, rank: rankOf(it), group: it.separate === "chemical" ? "chem" : "food", vol: it.w * it.d * it.h });
-  units.sort((a, b) => (a.group === b.group ? 0 : a.group === "food" ? -1 : 1) || a.rank - b.rank || b.vol - a.vol);
+  const raw = [];
+  items.forEach((it, pos) => {
+    for(let q = 0; q < it.qty && raw.length < 80; q++)
+      raw.push({ it, pos, rank: rankOf(it), lim: loadLimitOf(it), group: it.separate === "chemical" ? "chem" : "food", vol: it.w * it.d * it.h });
+  });
+  const units = orderUnits(raw);
 
+  // 袋ごとに2枚の地図を持つ：hm＝各マスの今の高さ、lim＝各マスの一番上に、あと何kgまで載せてよいか
+  const newBag = group => ({ group, hm:new Float32Array(nx * nz), lim:new Float32Array(nx * nz).fill(Infinity), kg:0, top:0, n:0 });
   const bags = [], placed = [];
-  const best = (hm, it) => {
+  // 置ける場所がなければ null（つぶれやすい物の上にしか置けないとき）
+  const best = (bag, it) => {
+    const { hm, lim } = bag;
     let r = null;
     const ors = orientations(it);
     for(let o = 0; o < ors.length; o++){
@@ -609,10 +884,16 @@ function pack(items, C){
       a = Math.min(a, W); b = Math.min(b, D); h = Math.min(h, H * 1.2);
       const ca = Math.min(nx, Math.ceil(a / cell - 0.01)), cb = Math.min(nz, Math.ceil(b / cell - 0.01));
       for(let iz = 0; iz + cb <= nz; iz++) for(let ix = 0; ix + ca <= nx; ix++){
-        let base = 0;
-        for(let z = iz; z < iz + cb; z++) for(let x = ix; x < ix + ca; x++){ const v = hm[z * nx + x]; if(v > base) base = v; }
+        let base = 0, minLim = Infinity;
+        for(let z = iz; z < iz + cb; z++) for(let x = ix; x < ix + ca; x++){
+          const k = z * nx + x;
+          if(hm[k] > base) base = hm[k];
+          if(lim[k] < minLim) minLim = lim[k];
+        }
+        // 下にある物が耐えられない重さなら、この場所には置かない
+        if(it.kg > minLim + 1e-6) continue;
         const score = base + h + (ix + iz) * 0.01;
-        if(!r || score < r.score) r = { score, base, ix, iz, ca, cb, a, b, h, o, raw:ors[o] };
+        if(!r || score < r.score) r = { score, base, minLim, ix, iz, ca, cb, a, b, h, o, raw:ors[o] };
       }
     }
     return r;
@@ -622,32 +903,38 @@ function pack(items, C){
     let bag = null, p = null;
     for(const bg of bags){
       if(bg.group !== u.group || bg.kg + u.it.kg > C.kg) continue;
-      const q = best(bg.hm, u.it);
+      const q = best(bg, u.it);
       if(q && q.base + q.h <= H + 0.5){ bag = bg; p = q; break; }
     }
     if(!bag){
-      bag = { group:u.group, hm:new Float32Array(nx * nz), kg:0, top:0, n:0 };
-      bags.push(bag); p = best(bag.hm, u.it);
+      bag = newBag(u.group);
+      bags.push(bag); p = best(bag, u.it);
     }
-    for(let z = p.iz; z < p.iz + p.cb; z++) for(let x = p.ix; x < p.ix + p.ca; x++) bag.hm[z * nx + x] = p.base + p.h;
+    // 置いた物の上に載せてよい重さ＝「この商品自身の上限」と「下の物の残りの上限から、この商品の重さを引いた分」の小さい方
+    const nextLim = Math.min(u.lim, p.minLim - u.it.kg);
+    for(let z = p.iz; z < p.iz + p.cb; z++) for(let x = p.ix; x < p.ix + p.ca; x++){
+      bag.hm[z * nx + x] = p.base + p.h;
+      bag.lim[z * nx + x] = nextLim;
+    }
     bag.kg += u.it.kg; bag.top = Math.max(bag.top, p.base + p.h); bag.n++;
     // o: 置いた向き（orientations() の番号）。raw: その向きでの縮める前の寸法。3Dで向きと縮尺を合わせるのに使う
     // first: 同じ商品が複数あるとき、名前の札を1つだけ出すための目印
     const first = !labeled.has(u.it.id); labeled.add(u.it.id);
-    placed.push({ bag: bags.indexOf(bag), rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, kind: u.it.kind, name: u.it.name, first,
+    placed.push({ bag: bags.indexOf(bag), step: u.step, rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, kind: u.it.kind, name: u.it.name, first,
       o: p.o, raw: p.raw, dims: [u.it.w, u.it.h, u.it.d],
       w:p.a, d:p.b, h:p.h, x: p.ix * cell + p.a / 2 - W / 2, z: p.iz * cell + p.b / 2 - D / 2, y: p.base + p.h / 2 });
   }
   return { C, bags, placed, colorOf, units };
 }
 
-// 実際に出てきた段階だけを手順にする
+// 入れる順番どおりの手順。同じ段階が続くところは1つの手順にまとめる
 function buildSteps(packed){
-  const ranks = [...new Set(packed.units.map(u => u.rank))].sort((a, b) => a - b);
-  return ranks.map(r => ({ rank:r, ...STEP_TEXT[r] }));
+  const steps = [];
+  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = { rank:u.rank, ...STEP_TEXT[u.rank] };
+  return steps;
 }
 
-App.packing = { pack, buildSteps, rankOf, colorFor };
+App.packing = { pack, buildSteps, rankOf, colorFor, loadLimitOf };
 })(window.App = window.App || {});
 </script>
 <script>
@@ -656,7 +943,7 @@ App.packing = { pack, buildSteps, rankOf, colorFor };
 // 寝かせる・回す・袋に合わせて縮めるのは scene3d.js 側でやる。
 (function(App){
 "use strict";
-if(typeof THREE === "undefined"){ App.models = { build: () => null }; return; }
+if(typeof THREE === "undefined"){ App.models = { build: () => null, get: () => null, cacheSize: () => 0 }; return; }
 
 // 材質。t を渡すと半透明
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
@@ -885,7 +1172,34 @@ function build(kind, shape, w, h, d, color){
   return f ? f(w, h, d, color) : fallback(w, h, d, shape, color);
 }
 
-App.models = { build };
+// ---------- 一度作ったモデルを保存して使い回す ----------
+// 形は「種類・寸法・色」で決まるので、それを目印に、最初に作ったモデル（ひな形）を取っておく。
+// 2回目からはひな形を複製するだけ。形のデータ（ジオメトリ）は全部の複製で共有し、
+// 材質だけ複製する（手順の再生で今の商品を光らせるとき、ほかの同じ形まで光らないように）。
+// ひな形の形データには keep の印を付け、scene3d.js の後片付けで捨てないようにする。
+const CACHE_MAX = 200;
+const cache = new Map();
+const round = v => Math.round(v * 2) / 2;   // 0.5cm単位にそろえて、ほぼ同じ寸法は同じひな形にする
+function get(kind, shape, w, h, d, color){
+  const key = [kind || "-", kind ? "" : shape, round(w), round(h), round(d), kind && kind !== "bx" ? "" : color].join("|");
+  let tpl = cache.get(key);
+  if(tpl){ cache.delete(key); cache.set(key, tpl); }   // 最近使った物を後ろへ（古い物から捨てるため）
+  else{
+    tpl = build(kind, shape, w, h, d, color);
+    tpl.traverse(o => { if(o.geometry) o.geometry.userData.keep = true; });
+    cache.set(key, tpl);
+    if(cache.size > CACHE_MAX){
+      const [oldKey, old] = cache.entries().next().value;
+      cache.delete(oldKey);
+      old.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); });
+    }
+  }
+  const copy = tpl.clone(true);
+  copy.traverse(o => { if(o.material) o.material = o.material.clone(); });
+  return copy;
+}
+
+App.models = { build, get, cacheSize: () => cache.size };
 })(window.App = window.App || {});
 </script>
 <script>
@@ -960,7 +1274,14 @@ function resize(){
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
 }
-function disposeAll(){ root.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose?.(); }); root.clear(); meshes = []; }
+// 後片付け。保存してあるモデルの形データ（keep）と札の画像（keep）は、使い回すので捨てない
+function disposeAll(){
+  root.traverse(o => {
+    if(o.geometry && !o.geometry.userData.keep) o.geometry.dispose();
+    if(o.material){ if(o.material.map && !o.material.map.userData.keep) o.material.map.dispose(); o.material.dispose?.(); }
+  });
+  root.clear(); meshes = [];
+}
 function retheme(){ if(ready && root) root.traverse(o => { if(o.userData.themed) o.material.color = cssColor(o.userData.themed); }); }
 
 // レジ袋：半透明の袋＋持ち手。点線は「ここまで詰めてOK」の高さ。戻り値は描いた物の一番上
@@ -1019,7 +1340,7 @@ const ROT = [
 // 1個の商品を組み立てる：holder（位置・落下アニメ）→ wrap（袋に合わせて縮める）→ outer → inner（向き）→ モデル
 function itemObject(p){
   const [w, h, d] = p.dims;
-  const model = App.models.build(p.kind, p.shape, w, h, d, p.color);
+  const model = App.models.get(p.kind, p.shape, w, h, d, p.color);
   const inner = new THREE.Group(); inner.add(model);
   const r = ROT[p.o] || ROT[0];
   inner.rotation.set(r.ix, 0, r.iz);
@@ -1033,8 +1354,22 @@ function itemObject(p){
   return { holder, mats };
 }
 
-// 商品名の札（常にカメラの方を向く板）
+// 商品名の札（常にカメラの方を向く板）。札の画像は名前ごとに保存して使い回す
+const labelCache = new Map();
 function makeLabel(text, worldH){
+  let tex = labelCache.get(text);
+  if(!tex){
+    tex = drawLabel(text);
+    tex.userData.keep = true;
+    labelCache.set(text, tex);
+    if(labelCache.size > 200){ const [k, old] = labelCache.entries().next().value; labelCache.delete(k); old.dispose(); }
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true }));
+  sp.scale.set(worldH * tex.image.width / tex.image.height, worldH, 1);
+  sp.renderOrder = 10;
+  return sp;
+}
+function drawLabel(text){
   const fs = 44, pad = 14, c = document.createElement("canvas"), g = c.getContext("2d");
   const font = `700 ${fs}px "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif`;
   g.font = font;
@@ -1047,10 +1382,7 @@ function makeLabel(text, worldH){
   g.arcTo(0, c.height, 0, 0, rr); g.arcTo(0, 0, c.width, 0, rr); g.fill();
   g.fillStyle = "#FFFFFF"; g.textBaseline = "middle"; g.fillText(text, pad, c.height / 2 + 2);
   const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true }));
-  sp.scale.set(worldH * c.width / c.height, worldH, 1);
-  sp.renderOrder = 10;
-  return sp;
+  return tex;
 }
 
 // packed: packing.pack() の結果、steps: packing.buildSteps() の結果
@@ -1076,7 +1408,7 @@ function show(packedResult, steps){
       label.visible = false;
       holder.add(label);
     }
-    meshes.push({ m:holder, mats, label, step: steps.findIndex(s => s.rank === p.rank), y:p.y, t0:0 });
+    meshes.push({ m:holder, mats, label, step: p.step, y:p.y, t0:0 });
   });
   view.target = new THREE.Vector3(0, topY * 0.42, 0);
   view.base = Math.max(span * 1.25, topY * 2.2) + 15;
@@ -1125,6 +1457,65 @@ App.scene3d = { init, show, setStep };
 })(window.App = window.App || {});
 </script>
 <script>
+// 音声での案内（ブラウザ標準の読み上げ機能 speechSynthesis を使う。マイクは使わない）
+(function(App){
+"use strict";
+
+const synth = window.speechSynthesis;
+const supported = !!synth && typeof SpeechSynthesisUtterance !== "undefined";
+const PREF_KEY = "fukurozume.voice";
+let enabled = true;
+try { const v = localStorage.getItem(PREF_KEY); if(v != null) enabled = v === "1"; } catch {}
+
+// 日本語の声を選ぶ（声の一覧はあとから読み込まれることがあるので、毎回探す）
+function jaVoice(){
+  if(!supported) return null;
+  const vs = synth.getVoices();
+  return vs.find(v => /^ja(-|_|$)/i.test(v.lang) && v.localService) || vs.find(v => /^ja(-|_|$)/i.test(v.lang)) || null;
+}
+
+// 商品名の単位を、読み上げで自然に聞こえる言葉に直す（「1L」→「1リットル」など）
+function speakable(text){
+  return String(text)
+    .replace(/(\d+(?:\.\d+)?)\s*(?:ml|mL|ML|ｍｌ)/g, "$1ミリリットル")
+    .replace(/(\d+(?:\.\d+)?)\s*(?:L|ℓ|Ｌ)(?![a-zA-Z])/g, "$1リットル")
+    .replace(/(\d+(?:\.\d+)?)\s*kg/gi, "$1キロ")
+    .replace(/(\d+(?:\.\d+)?)\s*g(?![a-zA-Z])/g, "$1グラム")
+    .replace(/[×xX]\s*(\d+)/g, "$1個")
+    .replace(/\s+/g, " ");
+}
+
+let speakId = 0;
+// 読み終わったら解決する Promise を返す。止めたとき・失敗したときも解決する（再生の流れが止まらないように）
+function speak(text){
+  if(!supported || !enabled) return Promise.resolve(false);
+  synth.cancel();
+  const id = ++speakId;
+  return new Promise(resolve => {
+    const u = new SpeechSynthesisUtterance(speakable(text));
+    u.lang = "ja-JP"; u.rate = 1.05;
+    const v = jaVoice(); if(v) u.voice = v;
+    let done = false;
+    const finish = ok => { if(done) return; done = true; clearTimeout(guard); resolve(ok && id === speakId); };
+    u.onend = () => finish(true);
+    u.onerror = () => finish(false);
+    // 読み終わりの合図が来ないブラウザがあるので、文の長さから見た時間で打ち切る
+    const guard = setTimeout(() => finish(true), 2500 + text.length * 220);
+    synth.speak(u);
+  });
+}
+function cancel(){ speakId++; if(supported) synth.cancel(); }
+
+function setEnabled(on){
+  enabled = !!on;
+  try { localStorage.setItem(PREF_KEY, enabled ? "1" : "0"); } catch {}
+  if(!enabled) cancel();
+}
+
+App.voice = { supported, speak, cancel, setEnabled, enabled: () => supported && enabled };
+})(window.App = window.App || {});
+</script>
+<script>
 // 画面の操作と表示（入力欄、袋の選択、結果の一覧・手順・統計）
 (function(App){
 "use strict";
@@ -1132,31 +1523,148 @@ const { $, el, fmt, reduceMotion } = App.util;
 const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
 const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
-let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null;
-const container = () => state.containerId === "photo" && state.photoContainer ? state.photoContainer : PRESETS.find(p => p.id === state.containerId);
+let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
+// マイバッグ（bag-store.js に保存した袋・箱）を、袋詰めの計算で使う形にする
+const fromMyBag = b => ({ id:b.id, group:"マイバッグ", label:b.name, kind:b.kind, W:b.W, D:b.D, H:b.H, kg:b.kg });
+const myBags = () => App.bagStore.bags().map(fromMyBag);
+function container(){
+  const id = state.containerId;
+  if(id === "photo" && state.photoContainer) return state.photoContainer;
+  return myBags().find(b => b.id === id) || PRESETS.find(p => p.id === id) || PRESETS.find(p => p.id === DEFAULT_CONTAINER);
+}
+function selectContainer(id){
+  state.containerId = id;
+  renderContainerSeg(); renderPack();
+  if(id !== "photo") App.bagStore.setLast(id).catch(() => {});
+}
 
 // ---------- 袋・箱の選択 ----------
+let armedDelete = "";   // 削除ボタンを1回押して「本当に消す？」の状態になっている袋のid
+
+// 袋・箱の選択肢は2か所に出す：最初の画面の「使うバッグ」と、ふつうの画面の「2 詰める袋・箱」
 function renderContainerSeg(){
-  const host = $("containerSeg"); host.textContent = "";
-  const groups = [["レジ袋", PRESETS.filter(p => p.group === "レジ袋")], ["段ボール（3辺合計cm）", PRESETS.filter(p => p.group === "段ボール")]];
-  if(state.photoContainer) groups.unshift(["写真から測った大きさ", [state.photoContainer]]);
-  for(const [title, list] of groups){
+  fillContainerHost($("containerSeg"), false);
+  fillContainerHost($("introBagList"), true);
+  const C = container(), now = $("bpNow"); now.textContent = "";
+  now.append(el("b", null, nameOf(C)), el("span", null, `${Math.round(C.W)}×${Math.round(C.D)}×${Math.round(C.H)}cm・${C.kg}kgまで`));
+}
+function setIntroList(open){
+  $("introBagList").hidden = !open;
+  $("bpToggle").setAttribute("aria-expanded", String(open));
+  $("bpToggle").textContent = open ? "閉じる" : "変更する";
+}
+
+// inIntro: 最初の画面の一覧なら、選んだら一覧を閉じる
+function fillContainerHost(host, inIntro){
+  host.textContent = "";
+  const dims = p => el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`);
+  const choice = p => {
+    const b = el("button", null, p.label); b.type = "button";
+    b.setAttribute("aria-pressed", String(p.id === state.containerId));
+    b.append(dims(p));
+    b.onclick = () => { selectContainer(p.id); if(inIntro) setIntroList(false); };
+    return b;
+  };
+  const group = (title, nodes) => {
     const g = el("div", "seggroup");
     const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", title);
-    for(const p of list){
-      const b = el("button", null, p.label); b.type = "button";
-      b.setAttribute("aria-pressed", String(p.id === state.containerId));
-      b.append(el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`));
-      b.onclick = () => { state.containerId = p.id; renderContainerSeg(); renderPack(); };
-      seg.append(b);
-    }
+    seg.append(...nodes);
     g.append(el("span", "sub", title), seg); host.append(g);
+  };
+
+  // 写真から測った大きさ（＋そのまま保存するボタン）
+  if(state.photoContainer){
+    const save = el("button", "add", "＋ マイバッグに保存"); save.type = "button";
+    save.onclick = () => openBagForm(state.photoContainer, host);
+    group("写真から測った大きさ", [choice(state.photoContainer), save]);
   }
+
+  // マイバッグ（各袋の横に削除ボタン。1回目で赤くなり、2回目で消す）
+  const where = { cloud:"このアカウントに保存", local:"この端末に保存", memory:"このページを閉じると消えます" }[App.bagStore.mode()];
+  const mine = myBags().map(p => {
+    const wrap = el("span", "mybag");
+    const del = el("button", "del" + (armedDelete === p.id ? " armed" : ""), armedDelete === p.id ? "削除" : "×"); del.type = "button";
+    del.setAttribute("aria-label", `${p.label}を削除`);
+    del.onclick = async () => {
+      if(armedDelete !== p.id){ armedDelete = p.id; renderContainerSeg(); return; }
+      armedDelete = "";
+      try{ await App.bagStore.removeBag(p.id); setStatus(`「${p.label}」を削除しました`); }
+      catch{ setStatus("削除できませんでした。通信状況を確認して、もう一度お試しください。", true); }
+      if(state.containerId === p.id) selectContainer(DEFAULT_CONTAINER); else renderContainerSeg();
+    };
+    wrap.append(choice(p), del);
+    return wrap;
+  });
+  const add = el("button", "add", "＋ マイバッグを登録"); add.type = "button";
+  add.onclick = () => openBagForm(container(), host);
+  group(`マイバッグ（${where}）`, [...mine, add]);
+
+  group("レジ袋", PRESETS.filter(p => p.group === "レジ袋").map(choice));
+  group("段ボール（3辺合計cm）", PRESETS.filter(p => p.group === "段ボール").map(choice));
+}
+
+// ---------- マイバッグの登録フォーム ----------
+let bfKind = "bag";
+function setBfKind(k){
+  bfKind = k;
+  $("bfKind").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === k)));
+  $("bfHint").textContent = k === "box" ? "箱は内側の寸法を測ってください。" : "袋は、底から持ち手の付け根までの高さを測ってください。";
+}
+// base: 入力欄の初期値にする袋・箱（写真で測った大きさ、または今選んでいる袋）
+// anchor: 登録ボタンがあった一覧。フォームをそのすぐ下に移して開く（最初の画面でも、ふつうの画面でも使える）
+function openBagForm(base, anchor){
+  if(anchor) anchor.after($("bagForm"));
+  $("bfName").value = "";
+  $("bfW").value = String(Math.round(base?.W ?? 38));
+  $("bfD").value = String(Math.round(base?.D ?? 20));
+  $("bfH").value = String(Math.round(base?.H ?? 32));
+  $("bfKg").value = String(base?.kg ?? 10);
+  setBfKind(base?.kind === "box" ? "box" : "bag");
+  $("bfMsg").textContent = ""; $("bfMsg").classList.remove("err");
+  $("bagForm").hidden = false;
+  $("bfName").focus();
+}
+function closeBagForm(){ $("bagForm").hidden = true; }
+async function saveBagForm(){
+  const name = $("bfName").value.trim();
+  const v = id => Number($(id).value);
+  const [W, D, H, kg] = [v("bfW"), v("bfD"), v("bfH"), v("bfKg")];
+  const msg = $("bfMsg");
+  const bad = (text, focusId) => { msg.textContent = text; msg.classList.add("err"); $(focusId).focus(); };
+  if(!name) return bad("名前を入れてください。", "bfName");
+  if(!(W >= 5 && W <= 150)) return bad("幅は5〜150cmで入れてください。", "bfW");
+  if(!(D >= 3 && D <= 150)) return bad("奥行きは3〜150cmで入れてください。", "bfD");
+  if(!(H >= 5 && H <= 150)) return bad("高さは5〜150cmで入れてください。", "bfH");
+  if(!(kg >= 1 && kg <= 50)) return bad("耐荷重は1〜50kgで入れてください。", "bfKg");
+  $("bfSave").disabled = true;
+  try{
+    const saved = await App.bagStore.saveBag({ name, kind:bfKind, W, D, H, kg });
+    closeBagForm();
+    selectContainer(saved.id);
+    setIntroList(false);
+    setStatus(`「${saved.name}」をマイバッグに保存しました`);
+  }catch{
+    msg.textContent = "保存できませんでした。通信状況を確認して、もう一度押してください。"; msg.classList.add("err");
+  }finally{
+    $("bfSave").disabled = false;
+  }
+}
+function wireBagForm(){
+  $("bfKind").addEventListener("click", e => { const b = e.target.closest("button"); if(b) setBfKind(b.dataset.v); });
+  $("bfSave").onclick = saveBagForm;
+  $("bfCancel").onclick = closeBagForm;
+  $("bpToggle").onclick = () => setIntroList($("introBagList").hidden);
+  // フォームの中で Enter を押しても、外側の「詰め方を考える」が動かないようにする
+  $("bagForm").addEventListener("keydown", e => {
+    if(e.key === "Enter" && e.target.tagName === "INPUT"){ e.preventDefault(); saveBagForm(); }
+    if(e.key === "Escape"){ e.preventDefault(); closeBagForm(); }
+  });
 }
 
 // ---------- 写真 ----------
 const maxTotal = () => imgLimits?.maxCount ?? 4;
-function wirePhotos(input, dz, key, thumbs, cap){
+// after: 写真を追加し終えたあとに呼ぶ処理（任意）
+function wirePhotos(input, dz, key, thumbs, cap, after){
   const add = async list => {
     for(const f of [...list]){
       if(!f.type.startsWith("image/")) continue;
@@ -1170,6 +1678,7 @@ function wirePhotos(input, dz, key, thumbs, cap){
       }
     }
     draw();
+    after?.();
   };
   const draw = () => {
     const t = $(thumbs); t.textContent = "";
@@ -1223,8 +1732,9 @@ async function onSubmit(e){
       state.data = data; state.isSample = false;
       if(data.container){ state.photoContainer = data.container; state.containerId = "photo"; }
       renderAll();
+      setScreen("result");
       setStatus("できました。下の3Dで順番を確認してください");
-      $("summary").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
+      requestAnimationFrame(() => $("summary").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" }));
     }
   }catch(err){
     if(err?.code === "cancelled") setStatus("止めました");
@@ -1242,18 +1752,75 @@ function setStep(k, animate){
   document.querySelectorAll(".stepbtn").forEach((b, i) => b.setAttribute("aria-current", i === state.step ? "step" : "false"));
   $("stepnow").textContent = n ? `手順 ${state.step + 1} / ${n}` : "";
 }
-function stopPlay(){ clearInterval(playTimer); playTimer = null; $("playBtn").textContent = "最初から再生"; }
+// 再生：音声がオンなら、各手順を読み終わってから次へ進む（3Dの動きと声をそろえる）。オフなら1.6秒ごとに進む
+let playToken = 0, playing = false;
+const wait = ms => new Promise(r => { playTimer = setTimeout(r, ms); });
+function stopPlay(){
+  playToken++; playing = false;
+  clearTimeout(playTimer); playTimer = null;
+  App.voice.cancel();
+  $("playBtn").textContent = "最初から再生";
+}
+async function play(){
+  const my = ++playToken; playing = true;
+  $("playBtn").textContent = "一時停止";
+  for(let k = 0; k < steps.length; k++){
+    if(my !== playToken) return;
+    setStep(k, true);
+    // 最初の読み上げはボタンを押した流れの中で始まる（iPhoneは、押した直後でないと声を出させてくれない）
+    if(App.voice.enabled()){ await App.voice.speak(stepSpeech(k)); await wait(350); }
+    else await wait(1600);
+  }
+  if(my !== playToken) return;
+  if(App.voice.enabled()) await App.voice.speak(finishSpeech());
+  if(my === playToken){ playing = false; $("playBtn").textContent = "最初から再生"; }
+}
+// 手順を1つ選んだとき（一覧・◀▶）。音声がオンならその手順を読み上げる
+function goStep(k, animate){
+  stopPlay();
+  setStep(k, animate);
+  if(App.voice.enabled()) App.voice.speak(stepSpeech(state.step));
+}
+
+// 読み上げる文。「手順2。箱やパックで面をそろえる。冷凍餃子、鶏むね肉 パックを入れます。」
+// 袋が複数のときは「1つ目の袋に、〜を入れます。2つ目の袋に、〜を入れます。」
+function stepSpeech(k){
+  const s = steps[k], P = lastPacked;
+  if(!s || !P) return "";
+  const unit = P.C.kind === "box" ? "箱" : "袋", multi = P.bags.length > 1;
+  const byBag = new Map();
+  P.placed.filter(p => p.step === k).forEach(p => {
+    if(!byBag.has(p.bag)) byBag.set(p.bag, new Map());
+    const m = byBag.get(p.bag); m.set(p.name, (m.get(p.name) || 0) + 1);
+  });
+  const parts = [...byBag.entries()].sort((a, b) => a[0] - b[0]).map(([b, names]) => {
+    const list = [...names.entries()].map(([n, c]) => c > 1 ? `${n} ${c}つ` : n).join("、");
+    return (multi ? `${b + 1}つ目の${unit}に、` : "") + `${list}を入れます。`;
+  });
+  return `手順${k + 1}。${s.title}。${parts.join("")}`;
+}
+function finishSpeech(){
+  const P = lastPacked; if(!P) return "";
+  const unit = P.C.kind === "box" ? "箱" : "袋", n = P.bags.length;
+  return n > 1 ? `これで完了です。${n}つの${unit}に分けました。` : `これで完了です。全部、1つの${unit}に入りました。`;
+}
+
+function syncVoiceBtn(){
+  const b = $("voiceBtn");
+  b.hidden = !App.voice.supported;
+  b.setAttribute("aria-pressed", String(App.voice.enabled()));
+  b.setAttribute("aria-label", App.voice.enabled() ? "音声の案内をオフにする" : "音声の案内をオンにする");
+}
 function wirePlayback(){
-  $("playBtn").onclick = () => {
-    if(playTimer){ stopPlay(); return; }
-    setStep(0, true); $("playBtn").textContent = "一時停止";
-    playTimer = setInterval(() => {
-      if(state.step >= steps.length - 1){ stopPlay(); return; }
-      setStep(state.step + 1, true);
-    }, 1600);
+  $("playBtn").onclick = () => { if(playing){ stopPlay(); return; } play(); };
+  $("prevBtn").onclick = () => goStep(state.step - 1, false);
+  $("nextBtn").onclick = () => goStep(state.step + 1, true);
+  $("voiceBtn").onclick = () => {
+    App.voice.setEnabled(!App.voice.enabled());
+    syncVoiceBtn();
+    if(App.voice.enabled() && !playing) App.voice.speak("音声で案内します。");
   };
-  $("prevBtn").onclick = () => { stopPlay(); setStep(state.step - 1, false); };
-  $("nextBtn").onclick = () => { stopPlay(); setStep(state.step + 1, true); };
+  syncVoiceBtn();
 }
 
 // ---------- 結果の表示 ----------
@@ -1314,6 +1881,7 @@ function renderPack(){
   const d = state.data, C = container();
   const items = d.items.filter(it => it.qty > 0);
   const packed = App.packing.pack(items, C);
+  lastPacked = packed;
   steps = App.packing.buildSteps(packed);
 
   $("banner").hidden = !state.isSample;
@@ -1347,14 +1915,14 @@ function renderPack(){
     const body = el("div");
     body.append(el("h3", null, s.title), el("p", null, s.detail));
     const chips = el("div", "chips"); const seen = new Set();
-    packed.units.filter(u => u.rank === s.rank).forEach(u => {
+    packed.units.filter(u => u.step === k).forEach(u => {
       if(seen.has(u.it.id)) return; seen.add(u.it.id);
       const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = packed.colorOf.get(u.it.id);
       c.append(sw, u.it.name + (u.it.qty > 1 ? " ×" + u.it.qty : "")); chips.append(c);
     });
     body.append(chips);
     b.append(el("span", "n", String(k + 1)), body);
-    b.onclick = () => { stopPlay(); setStep(k, true); };
+    b.onclick = () => goStep(k, true);
     li.append(b); ol.append(li);
   });
 
@@ -1373,15 +1941,46 @@ function renderPack(){
 
 function renderAll(){ renderContainerSeg(); renderTable(); renderPack(); }
 
+// 画面の段階：「intro」（大きなボタンだけ）→「setup」（レシートの確認と袋・箱の選択）→「result」（結果）
+function setScreen(name){
+  $("app").classList.toggle("intro", name === "intro");
+  $("app").classList.toggle("setup", name === "setup");
+}
+
 async function start(){
   App.scene3d.init($("cv"), $("stage"));
   wirePhotos($("receiptInput"), $("dzReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
-  wirePhotos($("receiptCamera"), $("camReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
+  // 上の大きな「レシートを撮る」ボタンと「写真から選ぶ」。撮ったら最初の画面を抜けて、写真と「詰め方を考える」が見える位置へ
+  // 結果の画面にいるとき（撮り直し・追加）は、画面は切り替えずに入力欄まで動かすだけ
+  const toIntake = () => {
+    if($("app").classList.contains("intro")){ setScreen("setup"); window.scrollTo({ top:0 }); return; }
+    $("intake").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
+  };
+  wirePhotos($("receiptCamera"), $("heroCam"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
+  wirePhotos($("receiptPick"), $("heroPick"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
+  const toSample = () => { setScreen("result"); window.scrollTo({ top:0 }); };
+  $("skipIntro").onclick = toSample;
+  $("showSample").onclick = toSample;
   wirePhotos($("boxInput"), $("dzBox"), "boxPhoto", "boxThumbs", () => 1);
   $("intake").addEventListener("submit", onSubmit);
   $("stopBtn").onclick = () => ctl?.abort();
   wirePlayback();
+  wireBagForm();
   renderAll();
+
+  // マイバッグを読み込み、前回選んだ袋・箱があればそれを選ぶ。別の端末で変わったときも描き直す
+  App.bagStore.onChange(() => {
+    if(state.containerId !== "photo" && !PRESETS.some(p => p.id === state.containerId) && !App.bagStore.bags().some(b => b.id === state.containerId)){
+      state.containerId = DEFAULT_CONTAINER; renderPack();
+    }
+    renderContainerSeg();
+  });
+  App.bagStore.init().then(() => {
+    const last = App.bagStore.last();
+    if(last && last !== state.containerId && (PRESETS.some(p => p.id === last) || App.bagStore.bags().some(b => b.id === last))){
+      state.containerId = last; renderContainerSeg(); renderPack();
+    }
+  });
 
   const ai = await App.ai.init();
   // 写真は image-prep.js で必ずJPEGに変換してから送るので、iPhoneのHEICなども選べるよう accept は image/* のままにする

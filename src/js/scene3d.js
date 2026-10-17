@@ -69,7 +69,14 @@ function resize(){
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
 }
-function disposeAll(){ root.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose?.(); }); root.clear(); meshes = []; }
+// 後片付け。保存してあるモデルの形データ（keep）と札の画像（keep）は、使い回すので捨てない
+function disposeAll(){
+  root.traverse(o => {
+    if(o.geometry && !o.geometry.userData.keep) o.geometry.dispose();
+    if(o.material){ if(o.material.map && !o.material.map.userData.keep) o.material.map.dispose(); o.material.dispose?.(); }
+  });
+  root.clear(); meshes = [];
+}
 function retheme(){ if(ready && root) root.traverse(o => { if(o.userData.themed) o.material.color = cssColor(o.userData.themed); }); }
 
 // レジ袋：半透明の袋＋持ち手。点線は「ここまで詰めてOK」の高さ。戻り値は描いた物の一番上
@@ -128,7 +135,7 @@ const ROT = [
 // 1個の商品を組み立てる：holder（位置・落下アニメ）→ wrap（袋に合わせて縮める）→ outer → inner（向き）→ モデル
 function itemObject(p){
   const [w, h, d] = p.dims;
-  const model = App.models.build(p.kind, p.shape, w, h, d, p.color);
+  const model = App.models.get(p.kind, p.shape, w, h, d, p.color);
   const inner = new THREE.Group(); inner.add(model);
   const r = ROT[p.o] || ROT[0];
   inner.rotation.set(r.ix, 0, r.iz);
@@ -142,8 +149,22 @@ function itemObject(p){
   return { holder, mats };
 }
 
-// 商品名の札（常にカメラの方を向く板）
+// 商品名の札（常にカメラの方を向く板）。札の画像は名前ごとに保存して使い回す
+const labelCache = new Map();
 function makeLabel(text, worldH){
+  let tex = labelCache.get(text);
+  if(!tex){
+    tex = drawLabel(text);
+    tex.userData.keep = true;
+    labelCache.set(text, tex);
+    if(labelCache.size > 200){ const [k, old] = labelCache.entries().next().value; labelCache.delete(k); old.dispose(); }
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true }));
+  sp.scale.set(worldH * tex.image.width / tex.image.height, worldH, 1);
+  sp.renderOrder = 10;
+  return sp;
+}
+function drawLabel(text){
   const fs = 44, pad = 14, c = document.createElement("canvas"), g = c.getContext("2d");
   const font = `700 ${fs}px "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif`;
   g.font = font;
@@ -156,10 +177,7 @@ function makeLabel(text, worldH){
   g.arcTo(0, c.height, 0, 0, rr); g.arcTo(0, 0, c.width, 0, rr); g.fill();
   g.fillStyle = "#FFFFFF"; g.textBaseline = "middle"; g.fillText(text, pad, c.height / 2 + 2);
   const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true }));
-  sp.scale.set(worldH * c.width / c.height, worldH, 1);
-  sp.renderOrder = 10;
-  return sp;
+  return tex;
 }
 
 // packed: packing.pack() の結果、steps: packing.buildSteps() の結果
@@ -185,7 +203,7 @@ function show(packedResult, steps){
       label.visible = false;
       holder.add(label);
     }
-    meshes.push({ m:holder, mats, label, step: steps.findIndex(s => s.rank === p.rank), y:p.y, t0:0 });
+    meshes.push({ m:holder, mats, label, step: p.step, y:p.y, t0:0 });
   });
   view.target = new THREE.Vector3(0, topY * 0.42, 0);
   view.base = Math.max(span * 1.25, topY * 2.2) + 15;

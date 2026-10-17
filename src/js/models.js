@@ -3,7 +3,7 @@
 // 寝かせる・回す・袋に合わせて縮めるのは scene3d.js 側でやる。
 (function(App){
 "use strict";
-if(typeof THREE === "undefined"){ App.models = { build: () => null }; return; }
+if(typeof THREE === "undefined"){ App.models = { build: () => null, get: () => null, cacheSize: () => 0 }; return; }
 
 // 材質。t を渡すと半透明
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
@@ -232,5 +232,32 @@ function build(kind, shape, w, h, d, color){
   return f ? f(w, h, d, color) : fallback(w, h, d, shape, color);
 }
 
-App.models = { build };
+// ---------- 一度作ったモデルを保存して使い回す ----------
+// 形は「種類・寸法・色」で決まるので、それを目印に、最初に作ったモデル（ひな形）を取っておく。
+// 2回目からはひな形を複製するだけ。形のデータ（ジオメトリ）は全部の複製で共有し、
+// 材質だけ複製する（手順の再生で今の商品を光らせるとき、ほかの同じ形まで光らないように）。
+// ひな形の形データには keep の印を付け、scene3d.js の後片付けで捨てないようにする。
+const CACHE_MAX = 200;
+const cache = new Map();
+const round = v => Math.round(v * 2) / 2;   // 0.5cm単位にそろえて、ほぼ同じ寸法は同じひな形にする
+function get(kind, shape, w, h, d, color){
+  const key = [kind || "-", kind ? "" : shape, round(w), round(h), round(d), kind && kind !== "bx" ? "" : color].join("|");
+  let tpl = cache.get(key);
+  if(tpl){ cache.delete(key); cache.set(key, tpl); }   // 最近使った物を後ろへ（古い物から捨てるため）
+  else{
+    tpl = build(kind, shape, w, h, d, color);
+    tpl.traverse(o => { if(o.geometry) o.geometry.userData.keep = true; });
+    cache.set(key, tpl);
+    if(cache.size > CACHE_MAX){
+      const [oldKey, old] = cache.entries().next().value;
+      cache.delete(oldKey);
+      old.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); });
+    }
+  }
+  const copy = tpl.clone(true);
+  copy.traverse(o => { if(o.material) o.material = o.material.clone(); });
+  return copy;
+}
+
+App.models = { build, get, cacheSize: () => cache.size };
 })(window.App = window.App || {});
