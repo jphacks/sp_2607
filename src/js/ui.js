@@ -5,31 +5,148 @@ const { $, el, fmt, reduceMotion } = App.util;
 const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
 const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
-let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null;
-const container = () => state.containerId === "photo" && state.photoContainer ? state.photoContainer : PRESETS.find(p => p.id === state.containerId);
+let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
+// マイバッグ（bag-store.js に保存した袋・箱）を、袋詰めの計算で使う形にする
+const fromMyBag = b => ({ id:b.id, group:"マイバッグ", label:b.name, kind:b.kind, W:b.W, D:b.D, H:b.H, kg:b.kg });
+const myBags = () => App.bagStore.bags().map(fromMyBag);
+function container(){
+  const id = state.containerId;
+  if(id === "photo" && state.photoContainer) return state.photoContainer;
+  return myBags().find(b => b.id === id) || PRESETS.find(p => p.id === id) || PRESETS.find(p => p.id === DEFAULT_CONTAINER);
+}
+function selectContainer(id){
+  state.containerId = id;
+  renderContainerSeg(); renderPack();
+  if(id !== "photo") App.bagStore.setLast(id).catch(() => {});
+}
 
 // ---------- 袋・箱の選択 ----------
+let armedDelete = "";   // 削除ボタンを1回押して「本当に消す？」の状態になっている袋のid
+
+// 袋・箱の選択肢は2か所に出す：最初の画面の「使うバッグ」と、ふつうの画面の「2 詰める袋・箱」
 function renderContainerSeg(){
-  const host = $("containerSeg"); host.textContent = "";
-  const groups = [["レジ袋", PRESETS.filter(p => p.group === "レジ袋")], ["段ボール（3辺合計cm）", PRESETS.filter(p => p.group === "段ボール")]];
-  if(state.photoContainer) groups.unshift(["写真から測った大きさ", [state.photoContainer]]);
-  for(const [title, list] of groups){
+  fillContainerHost($("containerSeg"), false);
+  fillContainerHost($("introBagList"), true);
+  const C = container(), now = $("bpNow"); now.textContent = "";
+  now.append(el("b", null, nameOf(C)), el("span", null, `${Math.round(C.W)}×${Math.round(C.D)}×${Math.round(C.H)}cm・${C.kg}kgまで`));
+}
+function setIntroList(open){
+  $("introBagList").hidden = !open;
+  $("bpToggle").setAttribute("aria-expanded", String(open));
+  $("bpToggle").textContent = open ? "閉じる" : "変更する";
+}
+
+// inIntro: 最初の画面の一覧なら、選んだら一覧を閉じる
+function fillContainerHost(host, inIntro){
+  host.textContent = "";
+  const dims = p => el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`);
+  const choice = p => {
+    const b = el("button", null, p.label); b.type = "button";
+    b.setAttribute("aria-pressed", String(p.id === state.containerId));
+    b.append(dims(p));
+    b.onclick = () => { selectContainer(p.id); if(inIntro) setIntroList(false); };
+    return b;
+  };
+  const group = (title, nodes) => {
     const g = el("div", "seggroup");
     const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", title);
-    for(const p of list){
-      const b = el("button", null, p.label); b.type = "button";
-      b.setAttribute("aria-pressed", String(p.id === state.containerId));
-      b.append(el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`));
-      b.onclick = () => { state.containerId = p.id; renderContainerSeg(); renderPack(); };
-      seg.append(b);
-    }
+    seg.append(...nodes);
     g.append(el("span", "sub", title), seg); host.append(g);
+  };
+
+  // 写真から測った大きさ（＋そのまま保存するボタン）
+  if(state.photoContainer){
+    const save = el("button", "add", "＋ マイバッグに保存"); save.type = "button";
+    save.onclick = () => openBagForm(state.photoContainer, host);
+    group("写真から測った大きさ", [choice(state.photoContainer), save]);
   }
+
+  // マイバッグ（各袋の横に削除ボタン。1回目で赤くなり、2回目で消す）
+  const where = { cloud:"このアカウントに保存", local:"この端末に保存", memory:"このページを閉じると消えます" }[App.bagStore.mode()];
+  const mine = myBags().map(p => {
+    const wrap = el("span", "mybag");
+    const del = el("button", "del" + (armedDelete === p.id ? " armed" : ""), armedDelete === p.id ? "削除" : "×"); del.type = "button";
+    del.setAttribute("aria-label", `${p.label}を削除`);
+    del.onclick = async () => {
+      if(armedDelete !== p.id){ armedDelete = p.id; renderContainerSeg(); return; }
+      armedDelete = "";
+      try{ await App.bagStore.removeBag(p.id); setStatus(`「${p.label}」を削除しました`); }
+      catch{ setStatus("削除できませんでした。通信状況を確認して、もう一度お試しください。", true); }
+      if(state.containerId === p.id) selectContainer(DEFAULT_CONTAINER); else renderContainerSeg();
+    };
+    wrap.append(choice(p), del);
+    return wrap;
+  });
+  const add = el("button", "add", "＋ マイバッグを登録"); add.type = "button";
+  add.onclick = () => openBagForm(container(), host);
+  group(`マイバッグ（${where}）`, [...mine, add]);
+
+  group("レジ袋", PRESETS.filter(p => p.group === "レジ袋").map(choice));
+  group("段ボール（3辺合計cm）", PRESETS.filter(p => p.group === "段ボール").map(choice));
+}
+
+// ---------- マイバッグの登録フォーム ----------
+let bfKind = "bag";
+function setBfKind(k){
+  bfKind = k;
+  $("bfKind").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === k)));
+  $("bfHint").textContent = k === "box" ? "箱は内側の寸法を測ってください。" : "袋は、底から持ち手の付け根までの高さを測ってください。";
+}
+// base: 入力欄の初期値にする袋・箱（写真で測った大きさ、または今選んでいる袋）
+// anchor: 登録ボタンがあった一覧。フォームをそのすぐ下に移して開く（最初の画面でも、ふつうの画面でも使える）
+function openBagForm(base, anchor){
+  if(anchor) anchor.after($("bagForm"));
+  $("bfName").value = "";
+  $("bfW").value = String(Math.round(base?.W ?? 38));
+  $("bfD").value = String(Math.round(base?.D ?? 20));
+  $("bfH").value = String(Math.round(base?.H ?? 32));
+  $("bfKg").value = String(base?.kg ?? 10);
+  setBfKind(base?.kind === "box" ? "box" : "bag");
+  $("bfMsg").textContent = ""; $("bfMsg").classList.remove("err");
+  $("bagForm").hidden = false;
+  $("bfName").focus();
+}
+function closeBagForm(){ $("bagForm").hidden = true; }
+async function saveBagForm(){
+  const name = $("bfName").value.trim();
+  const v = id => Number($(id).value);
+  const [W, D, H, kg] = [v("bfW"), v("bfD"), v("bfH"), v("bfKg")];
+  const msg = $("bfMsg");
+  const bad = (text, focusId) => { msg.textContent = text; msg.classList.add("err"); $(focusId).focus(); };
+  if(!name) return bad("名前を入れてください。", "bfName");
+  if(!(W >= 5 && W <= 150)) return bad("幅は5〜150cmで入れてください。", "bfW");
+  if(!(D >= 3 && D <= 150)) return bad("奥行きは3〜150cmで入れてください。", "bfD");
+  if(!(H >= 5 && H <= 150)) return bad("高さは5〜150cmで入れてください。", "bfH");
+  if(!(kg >= 1 && kg <= 50)) return bad("耐荷重は1〜50kgで入れてください。", "bfKg");
+  $("bfSave").disabled = true;
+  try{
+    const saved = await App.bagStore.saveBag({ name, kind:bfKind, W, D, H, kg });
+    closeBagForm();
+    selectContainer(saved.id);
+    setIntroList(false);
+    setStatus(`「${saved.name}」をマイバッグに保存しました`);
+  }catch{
+    msg.textContent = "保存できませんでした。通信状況を確認して、もう一度押してください。"; msg.classList.add("err");
+  }finally{
+    $("bfSave").disabled = false;
+  }
+}
+function wireBagForm(){
+  $("bfKind").addEventListener("click", e => { const b = e.target.closest("button"); if(b) setBfKind(b.dataset.v); });
+  $("bfSave").onclick = saveBagForm;
+  $("bfCancel").onclick = closeBagForm;
+  $("bpToggle").onclick = () => setIntroList($("introBagList").hidden);
+  // フォームの中で Enter を押しても、外側の「詰め方を考える」が動かないようにする
+  $("bagForm").addEventListener("keydown", e => {
+    if(e.key === "Enter" && e.target.tagName === "INPUT"){ e.preventDefault(); saveBagForm(); }
+    if(e.key === "Escape"){ e.preventDefault(); closeBagForm(); }
+  });
 }
 
 // ---------- 写真 ----------
 const maxTotal = () => imgLimits?.maxCount ?? 4;
-function wirePhotos(input, dz, key, thumbs, cap){
+// after: 写真を追加し終えたあとに呼ぶ処理（任意）
+function wirePhotos(input, dz, key, thumbs, cap, after){
   const add = async list => {
     for(const f of [...list]){
       if(!f.type.startsWith("image/")) continue;
@@ -43,6 +160,7 @@ function wirePhotos(input, dz, key, thumbs, cap){
       }
     }
     draw();
+    after?.();
   };
   const draw = () => {
     const t = $(thumbs); t.textContent = "";
@@ -96,8 +214,9 @@ async function onSubmit(e){
       state.data = data; state.isSample = false;
       if(data.container){ state.photoContainer = data.container; state.containerId = "photo"; }
       renderAll();
+      setScreen("result");
       setStatus("できました。下の3Dで順番を確認してください");
-      $("summary").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
+      requestAnimationFrame(() => $("summary").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" }));
     }
   }catch(err){
     if(err?.code === "cancelled") setStatus("止めました");
@@ -115,18 +234,75 @@ function setStep(k, animate){
   document.querySelectorAll(".stepbtn").forEach((b, i) => b.setAttribute("aria-current", i === state.step ? "step" : "false"));
   $("stepnow").textContent = n ? `手順 ${state.step + 1} / ${n}` : "";
 }
-function stopPlay(){ clearInterval(playTimer); playTimer = null; $("playBtn").textContent = "最初から再生"; }
+// 再生：音声がオンなら、各手順を読み終わってから次へ進む（3Dの動きと声をそろえる）。オフなら1.6秒ごとに進む
+let playToken = 0, playing = false;
+const wait = ms => new Promise(r => { playTimer = setTimeout(r, ms); });
+function stopPlay(){
+  playToken++; playing = false;
+  clearTimeout(playTimer); playTimer = null;
+  App.voice.cancel();
+  $("playBtn").textContent = "最初から再生";
+}
+async function play(){
+  const my = ++playToken; playing = true;
+  $("playBtn").textContent = "一時停止";
+  for(let k = 0; k < steps.length; k++){
+    if(my !== playToken) return;
+    setStep(k, true);
+    // 最初の読み上げはボタンを押した流れの中で始まる（iPhoneは、押した直後でないと声を出させてくれない）
+    if(App.voice.enabled()){ await App.voice.speak(stepSpeech(k)); await wait(350); }
+    else await wait(1600);
+  }
+  if(my !== playToken) return;
+  if(App.voice.enabled()) await App.voice.speak(finishSpeech());
+  if(my === playToken){ playing = false; $("playBtn").textContent = "最初から再生"; }
+}
+// 手順を1つ選んだとき（一覧・◀▶）。音声がオンならその手順を読み上げる
+function goStep(k, animate){
+  stopPlay();
+  setStep(k, animate);
+  if(App.voice.enabled()) App.voice.speak(stepSpeech(state.step));
+}
+
+// 読み上げる文。「手順2。箱やパックで面をそろえる。冷凍餃子、鶏むね肉 パックを入れます。」
+// 袋が複数のときは「1つ目の袋に、〜を入れます。2つ目の袋に、〜を入れます。」
+function stepSpeech(k){
+  const s = steps[k], P = lastPacked;
+  if(!s || !P) return "";
+  const unit = P.C.kind === "box" ? "箱" : "袋", multi = P.bags.length > 1;
+  const byBag = new Map();
+  P.placed.filter(p => p.step === k).forEach(p => {
+    if(!byBag.has(p.bag)) byBag.set(p.bag, new Map());
+    const m = byBag.get(p.bag); m.set(p.name, (m.get(p.name) || 0) + 1);
+  });
+  const parts = [...byBag.entries()].sort((a, b) => a[0] - b[0]).map(([b, names]) => {
+    const list = [...names.entries()].map(([n, c]) => c > 1 ? `${n} ${c}つ` : n).join("、");
+    return (multi ? `${b + 1}つ目の${unit}に、` : "") + `${list}を入れます。`;
+  });
+  return `手順${k + 1}。${s.title}。${parts.join("")}`;
+}
+function finishSpeech(){
+  const P = lastPacked; if(!P) return "";
+  const unit = P.C.kind === "box" ? "箱" : "袋", n = P.bags.length;
+  return n > 1 ? `これで完了です。${n}つの${unit}に分けました。` : `これで完了です。全部、1つの${unit}に入りました。`;
+}
+
+function syncVoiceBtn(){
+  const b = $("voiceBtn");
+  b.hidden = !App.voice.supported;
+  b.setAttribute("aria-pressed", String(App.voice.enabled()));
+  b.setAttribute("aria-label", App.voice.enabled() ? "音声の案内をオフにする" : "音声の案内をオンにする");
+}
 function wirePlayback(){
-  $("playBtn").onclick = () => {
-    if(playTimer){ stopPlay(); return; }
-    setStep(0, true); $("playBtn").textContent = "一時停止";
-    playTimer = setInterval(() => {
-      if(state.step >= steps.length - 1){ stopPlay(); return; }
-      setStep(state.step + 1, true);
-    }, 1600);
+  $("playBtn").onclick = () => { if(playing){ stopPlay(); return; } play(); };
+  $("prevBtn").onclick = () => goStep(state.step - 1, false);
+  $("nextBtn").onclick = () => goStep(state.step + 1, true);
+  $("voiceBtn").onclick = () => {
+    App.voice.setEnabled(!App.voice.enabled());
+    syncVoiceBtn();
+    if(App.voice.enabled() && !playing) App.voice.speak("音声で案内します。");
   };
-  $("prevBtn").onclick = () => { stopPlay(); setStep(state.step - 1, false); };
-  $("nextBtn").onclick = () => { stopPlay(); setStep(state.step + 1, true); };
+  syncVoiceBtn();
 }
 
 // ---------- 結果の表示 ----------
@@ -187,6 +363,7 @@ function renderPack(){
   const d = state.data, C = container();
   const items = d.items.filter(it => it.qty > 0);
   const packed = App.packing.pack(items, C);
+  lastPacked = packed;
   steps = App.packing.buildSteps(packed);
 
   $("banner").hidden = !state.isSample;
@@ -220,14 +397,14 @@ function renderPack(){
     const body = el("div");
     body.append(el("h3", null, s.title), el("p", null, s.detail));
     const chips = el("div", "chips"); const seen = new Set();
-    packed.units.filter(u => u.rank === s.rank).forEach(u => {
+    packed.units.filter(u => u.step === k).forEach(u => {
       if(seen.has(u.it.id)) return; seen.add(u.it.id);
       const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = packed.colorOf.get(u.it.id);
       c.append(sw, u.it.name + (u.it.qty > 1 ? " ×" + u.it.qty : "")); chips.append(c);
     });
     body.append(chips);
     b.append(el("span", "n", String(k + 1)), body);
-    b.onclick = () => { stopPlay(); setStep(k, true); };
+    b.onclick = () => goStep(k, true);
     li.append(b); ol.append(li);
   });
 
@@ -246,15 +423,46 @@ function renderPack(){
 
 function renderAll(){ renderContainerSeg(); renderTable(); renderPack(); }
 
+// 画面の段階：「intro」（大きなボタンだけ）→「setup」（レシートの確認と袋・箱の選択）→「result」（結果）
+function setScreen(name){
+  $("app").classList.toggle("intro", name === "intro");
+  $("app").classList.toggle("setup", name === "setup");
+}
+
 async function start(){
   App.scene3d.init($("cv"), $("stage"));
   wirePhotos($("receiptInput"), $("dzReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
-  wirePhotos($("receiptCamera"), $("camReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
+  // 上の大きな「レシートを撮る」ボタンと「写真から選ぶ」。撮ったら最初の画面を抜けて、写真と「詰め方を考える」が見える位置へ
+  // 結果の画面にいるとき（撮り直し・追加）は、画面は切り替えずに入力欄まで動かすだけ
+  const toIntake = () => {
+    if($("app").classList.contains("intro")){ setScreen("setup"); window.scrollTo({ top:0 }); return; }
+    $("intake").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
+  };
+  wirePhotos($("receiptCamera"), $("heroCam"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
+  wirePhotos($("receiptPick"), $("heroPick"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
+  const toSample = () => { setScreen("result"); window.scrollTo({ top:0 }); };
+  $("skipIntro").onclick = toSample;
+  $("showSample").onclick = toSample;
   wirePhotos($("boxInput"), $("dzBox"), "boxPhoto", "boxThumbs", () => 1);
   $("intake").addEventListener("submit", onSubmit);
   $("stopBtn").onclick = () => ctl?.abort();
   wirePlayback();
+  wireBagForm();
   renderAll();
+
+  // マイバッグを読み込み、前回選んだ袋・箱があればそれを選ぶ。別の端末で変わったときも描き直す
+  App.bagStore.onChange(() => {
+    if(state.containerId !== "photo" && !PRESETS.some(p => p.id === state.containerId) && !App.bagStore.bags().some(b => b.id === state.containerId)){
+      state.containerId = DEFAULT_CONTAINER; renderPack();
+    }
+    renderContainerSeg();
+  });
+  App.bagStore.init().then(() => {
+    const last = App.bagStore.last();
+    if(last && last !== state.containerId && (PRESETS.some(p => p.id === last) || App.bagStore.bags().some(b => b.id === last))){
+      state.containerId = last; renderContainerSeg(); renderPack();
+    }
+  });
 
   const ai = await App.ai.init();
   // 写真は image-prep.js で必ずJPEGに変換してから送るので、iPhoneのHEICなども選べるよう accept は image/* のままにする
