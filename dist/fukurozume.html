@@ -1,0 +1,991 @@
+<title>袋づめ名人</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --ground:#ECEFEA; --surface:#F8FAF6; --sunk:#E2E7E1; --ink:#1C2420; --muted:#5A6660; --line:#D1D8D0;
+  --accent:#F0C419; --accent-ink:#1C2420; --accent-text:#7A6000;
+  --bag-line:#6F857B; --bag-fill:#9FB8AD;
+  --warn:#B4441F; --ok:#2E7D57; --cold:#2F6FB3;
+  --display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#121715; --surface:#1A211E; --sunk:#232B27; --ink:#E4EBE6; --muted:#97A39D; --line:#2D3732;
+    --accent:#F0C419; --accent-ink:#1C2420; --accent-text:#F0C419;
+    --bag-line:#9DB6AB; --bag-fill:#6F8C80; --warn:#F08A62; --ok:#6CC79A; --cold:#7DB4EE;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#121715; --surface:#1A211E; --sunk:#232B27; --ink:#E4EBE6; --muted:#97A39D; --line:#2D3732;
+  --accent:#F0C419; --accent-ink:#1C2420; --accent-text:#F0C419;
+  --bag-line:#9DB6AB; --bag-fill:#6F8C80; --warn:#F08A62; --ok:#6CC79A; --cold:#7DB4EE;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{text-wrap:balance;margin:0}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{width:44px;height:44px;flex:none}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);line-height:1.1;letter-spacing:.02em}
+.tag{color:var(--muted);font-size:14px;margin:0;max-width:34em}
+.label{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--muted)}
+
+/* input */
+.intake{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;grid-template-columns:1fr 1.15fr;gap:24px}
+@media (max-width:760px){.intake{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.field{display:flex;flex-direction:column;gap:8px}
+.dropzone{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:132px;border:2px dashed var(--line);border-radius:10px;background:var(--sunk);cursor:pointer;text-align:center;padding:14px;transition:border-color .15s}
+.dropzone.small{min-height:76px;flex-direction:row;gap:10px;text-align:left;justify-content:flex-start}
+.dropzone:hover,.dropzone.over{border-color:var(--accent)}
+.dropzone:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.dropzone strong{font-size:16px}
+.dropzone span{font-size:13px;color:var(--muted)}
+.dropzone input{position:absolute;opacity:0;width:1px;height:1px}
+.receiptico{width:26px;height:34px;flex:none}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.thumbs:empty{display:none}
+.thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;background:var(--sunk)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(20,25,22,.75);color:#fff;font-size:13px;line-height:1;cursor:pointer}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:14px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.seg button small{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px}
+.seggroup{display:flex;flex-direction:column;gap:6px}
+.seggroup .sub{font-size:12px;color:var(--muted)}
+.seg button:focus-visible,.btn:focus-visible,.stepbtn:focus-visible,.ctl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.go{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.btn{font:inherit;font-weight:700;font-size:16px;padding:12px 22px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500;font-size:14px;padding:9px 16px}
+.status{font-size:14px;color:var(--muted)}
+.status.err{color:var(--warn)}
+
+/* results */
+.banner{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:10px 14px;border-radius:10px;background:var(--sunk);font-size:14px}
+.banner b{font-weight:700}
+.head{display:flex;flex-direction:column;gap:12px}
+.store{font-size:13px;color:var(--muted)}
+.summary{font-size:clamp(18px,3vw,22px);font-weight:700;line-height:1.5;margin:0;max-width:40em}
+.stats{display:flex;flex-wrap:wrap;gap:10px 32px}
+.stat{display:flex;flex-direction:column}
+.stat .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:22px;line-height:1.3}
+.stat .v small{font-family:var(--body);font-size:13px;color:var(--muted);margin-left:3px}
+.stat .k{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.stat .v.bad{color:var(--warn)}
+.main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:860px){.main{grid-template-columns:1fr}}
+.viewer{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+@media (max-width:860px){.viewer{position:relative;top:auto}}
+.stage{position:relative;aspect-ratio:4/3.3;max-width:100%;cursor:grab;touch-action:pan-y}
+.stage:active{cursor:grabbing}
+.stage canvas{display:block;width:100%;height:100%}
+.hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);pointer-events:none}
+.bagtags{position:absolute;top:10px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+.bagtag{font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:6px;background:var(--ground);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.bagtag.over{color:var(--warn);border-color:var(--warn)}
+.bagtag.note{font-family:var(--body)}
+.controls{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.ctl{font:inherit;font-size:14px;min-width:40px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--ground);color:var(--ink);cursor:pointer}
+.ctl.play{background:var(--ink);color:var(--ground);border-color:var(--ink);font-weight:700}
+.stepnow{flex:1;font-size:13px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.stepbtn{width:100%;text-align:left;font:inherit;color:inherit;display:grid;grid-template-columns:36px 1fr;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.stepbtn[aria-current="step"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.stepbtn .n{font-family:var(--display);font-size:22px;line-height:1.2;color:var(--accent-text)}
+.stepbtn h3{font-size:15px;font-weight:700;line-height:1.5}
+.stepbtn p{margin:2px 0 6px;font-size:14px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:1px 8px 1px 6px;border-radius:6px;background:var(--sunk)}
+.sw{width:9px;height:9px;border-radius:2px;flex:none}
+
+section{display:flex;flex-direction:column;gap:10px}
+section h2{font-size:17px;font-weight:700}
+section .lead{margin:0;font-size:13px;color:var(--muted)}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:720px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700;white-space:nowrap}
+.rc{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+.guess{display:inline-block;font-size:11px;padding:0 6px;border-radius:5px;border:1px solid var(--warn);color:var(--warn);margin-left:6px;vertical-align:1px}
+td input[type="number"]{font-family:var(--mono);font-size:13px;width:52px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--ground);color:var(--ink);font-variant-numeric:tabular-nums}
+td input[type="number"].q{width:44px}
+td input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.dims{display:flex;align-items:center;gap:3px;white-space:nowrap;color:var(--muted);font-size:12px}
+.flag{display:inline-block;font-size:11px;padding:0 6px;border-radius:5px;background:var(--sunk);margin:1px 3px 1px 0;white-space:nowrap}
+.flag.cold{color:var(--cold)}
+.flag.warn{color:var(--warn)}
+.tip{font-size:13px;color:var(--muted)}
+.warns{margin:0;padding-left:1.2em;color:var(--muted);font-size:14px}
+footer{font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+        <path d="M8 16 L36 16 L33 40 L11 40 Z" fill="var(--accent)" />
+        <path d="M15 16 C15 8 20 6 22 11 C24 6 29 8 29 16" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="22" cy="13" r="2.6" fill="var(--ink)"/>
+      </svg>
+      <h1>袋づめ名人</h1>
+    </div>
+    <p class="tag">レシートを撮るだけ。買った物をどの順で、どの袋に詰めればいいか、3Dで先に見せます。</p>
+  </header>
+
+  <form class="intake" id="intake" autocomplete="off">
+    <div class="col">
+      <div class="field">
+        <span class="label">1　レシート</span>
+        <label class="dropzone" id="dzReceipt">
+          <input type="file" id="receiptInput" accept="image/jpeg,image/png,image/webp" multiple>
+          <svg class="receiptico" viewBox="0 0 26 34" aria-hidden="true"><path d="M2 1h22v31l-3.7-2.4-3.6 2.4-3.7-2.4-3.7 2.4-3.6-2.4L2 32z" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.5"/><path d="M6 8h14M6 13h10M6 18h14M6 23h8" stroke="var(--muted)" stroke-width="1.5"/></svg>
+          <strong>レシートを撮る / 選ぶ</strong>
+          <span>商品名が全部写るように。長いレシートは2〜3枚に分けてOK</span>
+        </label>
+        <div class="thumbs" id="receiptThumbs"></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="field">
+        <span class="label">2　詰める袋・箱</span>
+        <div id="containerSeg"></div>
+        <label class="dropzone small" id="dzBox">
+          <input type="file" id="boxInput" accept="image/jpeg,image/png,image/webp">
+          <span><strong style="color:var(--ink);font-size:14px">袋・箱の写真から測る（任意）</strong><br>レシートを横に置いて撮ると、レシートの幅をものさしにして大きさを測ります</span>
+        </label>
+        <div class="thumbs" id="boxThumbs"></div>
+      </div>
+      <div class="go">
+        <button type="submit" class="btn" id="goBtn" disabled>詰め方を考える</button>
+        <button type="button" class="btn ghost" id="stopBtn" hidden>止める</button>
+        <span class="status" id="status" role="status">レシートを選ぶと解析できます</span>
+      </div>
+    </div>
+  </form>
+
+  <div class="banner" id="banner"><b>表示中：サンプル</b><span>スーパーで12点買った例です。レシートを送ると、あなたの買い物に置き換わります。</span></div>
+
+  <div class="head">
+    <span class="store" id="store"></span>
+    <p class="summary" id="summary"></p>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="main">
+    <div class="viewer">
+      <div class="stage" id="stage">
+        <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
+        <div class="bagtags" id="bagtags"></div>
+        <div class="hint">ドラッグで回転・ホイールで拡大</div>
+      </div>
+      <div class="controls">
+        <button type="button" class="ctl" id="prevBtn" aria-label="前の手順">◀</button>
+        <button type="button" class="ctl play" id="playBtn">最初から再生</button>
+        <button type="button" class="ctl" id="nextBtn" aria-label="次の手順">▶</button>
+        <span class="stepnow" id="stepnow"></span>
+      </div>
+    </div>
+    <div>
+      <h2 class="label" style="margin-bottom:10px">詰める順番</h2>
+      <ol class="steps" id="steps"></ol>
+    </div>
+  </div>
+
+  <section>
+    <h2>買った物</h2>
+    <p class="lead">数字を直すと、すぐに詰め直します。「推測」の付いた商品は、レシートから特定しきれなかった物です。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>商品</th><th>個数</th><th>1個のサイズ（cm）</th><th>重さ（kg）</th><th>扱い</th></tr></thead>
+        <tbody id="itemRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="warnSec">
+    <h2>気をつけること</h2>
+    <ul class="warns" id="warnList"></ul>
+  </section>
+
+  <footer>商品のサイズと重さはAIによる目安です。袋の耐荷重は一般的な目安（レジ袋 小3kg・中5kg・大8kg など）で計算しています。</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 読み込み順に意味がある：後のファイルは前のファイルの App.* を使う -->
+<script>
+// 共通の小さな道具
+(function(App){
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(text != null) e.textContent = text;
+  return e;
+}
+
+// 小数を桁数そろえて表示（1.0kg など）
+const fmt = (v, dg = 1) => (Math.round(v * 10 ** dg) / 10 ** dg).toLocaleString("ja-JP", { maximumFractionDigits:dg, minimumFractionDigits:dg });
+
+// 数値に変換して範囲内に収める。変換できなければ d
+function num(v, lo, hi, d){ v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+App.util = { $, el, fmt, num, reduceMotion };
+})(window.App = window.App || {});
+</script>
+<script>
+// 袋・箱のサイズ、色、詰める手順の文言など「設定値」
+(function(App){
+"use strict";
+
+// 3Dと一覧で商品を見分けるための色
+const PALETTE = ["#E07A3F","#3A7BD5","#2FA38F","#C9A227","#8B6BD1","#D2577A","#5E8C3A","#4A9BB5","#B5653A","#6A7FD9","#C2478F","#7F9A2E"];
+
+// 内寸(cm)と耐荷重(kg)の目安
+const PRESETS = [
+  { id:"rs",  group:"レジ袋",   label:"小",   kind:"bag", W:22, D:12, H:22, kg:3 },
+  { id:"rm",  group:"レジ袋",   label:"中",   kind:"bag", W:28, D:15, H:27, kg:5 },
+  { id:"rl",  group:"レジ袋",   label:"大",   kind:"bag", W:34, D:18, H:32, kg:8 },
+  { id:"eco", group:"レジ袋",   label:"エコバッグ", kind:"bag", W:38, D:20, H:32, kg:10 },
+  { id:"b60", group:"段ボール", label:"60",  kind:"box", W:25, D:18, H:15, kg:10 },
+  { id:"b80", group:"段ボール", label:"80",  kind:"box", W:32, D:24, H:22, kg:15 },
+  { id:"b100",group:"段ボール", label:"100", kind:"box", W:38, D:30, H:28, kg:20 },
+  { id:"b120",group:"段ボール", label:"120", kind:"box", W:45, D:35, H:35, kg:25 }
+];
+const DEFAULT_CONTAINER = "rl";
+
+const nameOf = c => c.id === "photo" ? c.label : c.id === "eco" ? "エコバッグ" : c.group + " " + c.label + (c.kind === "box" ? "サイズ" : "");
+
+// 1 重い・立てる物 → 2 箱物 → 3 軽い物 → 4 つぶれやすい物 → 5 日用品は別袋
+const STEP_TEXT = {
+  1:{ title:"重い物・立てる物を底に", detail:"飲み物や缶詰など重い物を底に並べます。紙パックは立てて角に寄せると倒れません。" },
+  2:{ title:"箱やパックで面をそろえる", detail:"箱物・トレーを平らに積んで、上に物を置ける面を作ります。" },
+  3:{ title:"軽い物で隙間を埋める", detail:"野菜の袋や軽い物を、空いている隙間に入れます。" },
+  4:{ title:"つぶれやすい物を一番上に", detail:"卵・パン・お菓子は最後に、上にそっと置きます。" },
+  5:{ title:"日用品は別の袋に", detail:"洗剤などは食品と同じ袋に入れず、別の袋にまとめます。" }
+};
+
+App.config = { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf, STEP_TEXT };
+})(window.App = window.App || {});
+</script>
+<script>
+// 開いたときに表示する例（スーパーで12点）
+(function(App){
+"use strict";
+
+App.SAMPLE = {
+  store: "サンプル：近所のスーパー",
+  summary: "重い飲み物を底に、卵とパンは最後に上へ。洗剤は食品と別の袋に分けます。",
+  items: [
+    {id:"i1", receipt:"ｱｸｴﾘｱｽ 2L",       name:"スポーツドリンク 2L", qty:1, w:10.5,d:10.5,h:31, kg:2.1, shape:"box",      fragile:false, upright:false, temp:"room",    separate:"none",     confident:true,  tip:"寝かせて底に"},
+    {id:"i2", receipt:"ｵｲｼｲｷﾞｭｳﾆｭｳ 1000", name:"牛乳 1L",            qty:1, w:7,   d:7,   h:19.5, kg:1.05, shape:"box",    fragile:false, upright:true,  temp:"chilled", separate:"none",     confident:true,  tip:"立てて角に"},
+    {id:"i3", receipt:"ｼｰﾁｷﾝ 3P",          name:"ツナ缶 3缶パック",   qty:1, w:8.5, d:8.5, h:9,   kg:0.25, shape:"cylinder", fragile:false, upright:false, temp:"room",    separate:"none",     confident:true,  tip:""},
+    {id:"i4", receipt:"ﾄﾘﾑﾈﾆｸ",           name:"鶏むね肉 パック",     qty:1, w:20,  d:14,  h:4,   kg:0.35, shape:"box",      fragile:false, upright:false, temp:"chilled", separate:"raw",      confident:true,  tip:"ポリ袋に入れる"},
+    {id:"i5", receipt:"ﾚｲﾄｳｷﾞｮｳｻﾞ",       name:"冷凍餃子",           qty:1, w:26,  d:17,  h:3,   kg:0.4,  shape:"box",      fragile:false, upright:false, temp:"frozen",  separate:"none",     confident:true,  tip:"冷たい物どうし並べる"},
+    {id:"i6", receipt:"ﾀﾏﾈｷﾞ 3ｺ",          name:"玉ねぎ 3個入り",     qty:1, w:18,  d:12,  h:9,   kg:0.6,  shape:"soft",     fragile:false, upright:false, temp:"room",    separate:"none",     confident:true,  tip:""},
+    {id:"i7", receipt:"ｶｯﾌﾟﾒﾝ",           name:"カップ麺",           qty:2, w:10,  d:10,  h:11,  kg:0.1,  shape:"cylinder", fragile:false, upright:false, temp:"room",    separate:"none",     confident:false, tip:""},
+    {id:"i8", receipt:"ﾊﾞﾅﾅ",              name:"バナナ 1房",          qty:1, w:22,  d:12,  h:8,   kg:0.6,  shape:"soft",     fragile:true,  upright:false, temp:"room",    separate:"none",     confident:true,  tip:"上にそっと"},
+    {id:"i9", receipt:"ﾀﾏｺﾞ 10ｺ",          name:"卵 10個パック",       qty:1, w:26,  d:11,  h:7,   kg:0.65, shape:"box",      fragile:true,  upright:false, temp:"chilled", separate:"none",     confident:true,  tip:"一番上に平らに"},
+    {id:"i10",receipt:"ｼｮｸﾊﾟﾝ 6ﾏｲ",        name:"食パン 6枚切り",      qty:1, w:12,  d:13,  h:19,  kg:0.4,  shape:"soft",     fragile:true,  upright:false, temp:"room",    separate:"none",     confident:true,  tip:"最後に上へ"},
+    {id:"i11",receipt:"ﾎﾟﾃﾄﾁｯﾌﾟｽ ｳｽｼｵ",    name:"ポテトチップス",      qty:1, w:20,  d:7,   h:27,  kg:0.06, shape:"soft",     fragile:true,  upright:false, temp:"room",    separate:"none",     confident:true,  tip:""},
+    {id:"i12",receipt:"ｾﾝﾀｸｾﾝｻﾞｲ ﾂﾒｶｴ",     name:"洗濯洗剤 詰め替え",   qty:1, w:16,  d:7,   h:26,  kg:0.8,  shape:"soft",     fragile:false, upright:false, temp:"room",    separate:"chemical", confident:true,  tip:"食品と別の袋へ"}
+  ],
+  container: null,
+  warnings: []
+};
+})(window.App = window.App || {});
+</script>
+<script>
+// 送る前に写真を軽くする。画像のトークン数はおよそ「幅×高さ÷750」なので、ピクセル数を減らすほど安くなる。
+// レシート：用紙部分だけ切り抜き → 白黒・濃淡補正 → 文字が読める幅（720px）まで縮小
+// 袋・箱：寸法を見るだけなので、小さめのカラー画像にする
+(function(App){
+"use strict";
+
+const RECEIPT_MAX_W = 720, RECEIPT_MAX_PX = 1.0e6, BOX_MAX_PX = 0.3e6, PLATFORM_MAX_PX = 1.2e6;
+
+// kind: "receipt" | "box"
+// 戻り値: { blob, tokens, origTokens, bytes, origBytes }
+async function prepImage(file, kind){
+  const bmp = await createImageBitmap(file, { imageOrientation:"from-image" });
+  const W0 = bmp.width, H0 = bmp.height;
+  const crop = (kind === "receipt" && findPaper(bmp)) || { x:0, y:0, w:W0, h:H0 };
+  const sc = kind === "receipt"
+    ? Math.min(1, RECEIPT_MAX_W / crop.w, Math.sqrt(RECEIPT_MAX_PX / (crop.w * crop.h)))
+    : Math.min(1, Math.sqrt(BOX_MAX_PX / (crop.w * crop.h)));
+  const w = Math.max(1, Math.round(crop.w * sc)), h = Math.max(1, Math.round(crop.h * sc));
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const g = cv.getContext("2d", { willReadFrequently:true });
+  g.imageSmoothingQuality = "high";
+  g.drawImage(bmp, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
+  bmp.close?.();
+  if(kind === "receipt") grayStretch(g, w, h);
+  const blob = await new Promise((res, rej) => cv.toBlob(b => b ? res(b) : rej(new Error("toBlob")), "image/jpeg", kind === "receipt" ? 0.8 : 0.72));
+  return { blob, tokens: Math.ceil(w * h / 750), origTokens: Math.ceil(Math.min(W0 * H0, PLATFORM_MAX_PX) / 750), bytes: blob.size, origBytes: file.size };
+}
+
+// 明るい（白い紙の）領域の外枠を探す。見つからない・ほぼ全面なら null（切り抜かない）
+function findPaper(bmp){
+  const aw = 160, ah = Math.max(1, Math.round(bmp.height * aw / bmp.width));
+  const c = document.createElement("canvas"); c.width = aw; c.height = ah;
+  const g = c.getContext("2d", { willReadFrequently:true }); g.drawImage(bmp, 0, 0, aw, ah);
+  const px = g.getImageData(0, 0, aw, ah).data, n = aw * ah, lum = new Uint8Array(n), hist = new Array(256).fill(0);
+  for(let i = 0; i < n; i++){ const v = (px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114) | 0; lum[i] = v; hist[v]++; }
+  // 大津の二値化でしきい値を決める
+  let sum = 0; for(let t = 0; t < 256; t++) sum += t * hist[t];
+  let sumB = 0, wB = 0, best = 0, th = 160;
+  for(let t = 0; t < 256; t++){
+    wB += hist[t]; if(!wB) continue; const wF = n - wB; if(!wF) break;
+    sumB += t * hist[t]; const mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) ** 2;
+    if(between > best){ best = between; th = t; }
+  }
+  const colHit = x => { let k = 0; for(let y = 0; y < ah; y++) if(lum[y * aw + x] > th) k++; return k / ah; };
+  let x0 = 0, x1 = aw - 1;
+  while(x0 < aw && colHit(x0) < 0.3) x0++;
+  while(x1 > x0 && colHit(x1) < 0.3) x1--;
+  const rowHit = y => { let k = 0; for(let x = x0; x <= x1; x++) if(lum[y * aw + x] > th) k++; return k / (x1 - x0 + 1); };
+  let y0 = 0, y1 = ah - 1;
+  while(y0 < ah && rowHit(y0) < 0.3) y0++;
+  while(y1 > y0 && rowHit(y1) < 0.3) y1--;
+  const area = (x1 - x0 + 1) * (y1 - y0 + 1) / n;
+  if(x1 <= x0 || y1 <= y0 || area < 0.12 || area > 0.92) return null;
+  const s = bmp.width / aw, mx = 0.03 * aw, my = 0.02 * ah;
+  const X0 = Math.max(0, (x0 - mx) * s), Y0 = Math.max(0, (y0 - my) * s);
+  const X1 = Math.min(bmp.width, (x1 + 1 + mx) * s), Y1 = Math.min(bmp.height, (y1 + 1 + my) * s);
+  return { x:X0, y:Y0, w:X1 - X0, h:Y1 - Y0 };
+}
+
+// 白黒にして、暗い2%〜明るい2%を0〜255に引き伸ばす（かすれた感熱紙の文字を読みやすくする）
+function grayStretch(g, w, h){
+  const im = g.getImageData(0, 0, w, h), d = im.data, n = w * h, hist = new Array(256).fill(0), lum = new Uint8Array(n);
+  for(let i = 0; i < n; i++){ const v = (d[i*4] * 0.299 + d[i*4+1] * 0.587 + d[i*4+2] * 0.114) | 0; lum[i] = v; hist[v]++; }
+  let lo = 0, hi = 255, acc = 0;
+  for(; lo < 255; lo++){ acc += hist[lo]; if(acc > n * 0.02) break; }
+  acc = 0; for(; hi > 0; hi--){ acc += hist[hi]; if(acc > n * 0.02) break; }
+  const span = Math.max(1, hi - lo);
+  for(let i = 0; i < n; i++){ const v = Math.max(0, Math.min(255, (lum[i] - lo) * 255 / span)); d[i*4] = d[i*4+1] = d[i*4+2] = v; }
+  g.putImageData(im, 0, 0);
+}
+
+App.imagePrep = { prepImage };
+})(window.App = window.App || {});
+</script>
+<script>
+// Claudeへの問い合わせ（レシートの読み取り）
+// 今は claude.ai の sample 機能を使う。API版にするときは analyze() の中身だけ差し替えればよい。
+(function(App){
+"use strict";
+const { num } = App.util;
+
+let sample = null, imgLimits = null;
+
+// 戻り値: { available, imgLimits }  imgLimits は写真を送れないときは null
+async function init(){
+  try { sample = window.claude ? await window.claude.use("sample") : null; } catch { sample = null; }
+  if(sample){
+    const lim = await sample.limits().catch(() => null);
+    imgLimits = lim?.images ?? null;
+  }
+  return { available: !!sample, imgLimits };
+}
+
+function buildPrompt(nR, hasBox){
+  // 返答はキー名なしの配列にして、出力トークン（入力の5倍の単価）を減らす
+  return `画像${nR}枚はレシート${nR > 1 ? "（分割撮影。重複行は1回だけ数える）" : ""}${hasBox ? "、最後の1枚は詰める袋か箱" : ""}。
+商品行ごとに1要素（値引き・袋代・小計・税・支払い行は除く）：
+[名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信]
+形 b=箱・パック c=缶・ボトル・カップ s=袋物・野菜・パン
+性質 F=つぶれやすい U=立てないとこぼれる 両方ならFU なければ""
+温度 f=冷凍 c=冷蔵 r=常温　分別 r=肉魚 x=洗剤など非食品 ""=なし　確信 1=特定できた 0=推測
+${hasBox ? "箱袋は内寸[幅,奥行,高さ(袋は持ち手の付け根まで),b=箱/g=袋]をレシート幅58/80mmやサイズ表記を物差しに推定。\n" : ""}JSONのみで返答：
+{"m":"詰め方の要点(30字以内)","c":${hasBox ? "[30,15,28,\"g\"]" : "null"},"i":[["卵10個パック",1,26,11,7,0.65,"b","F","c","",1]],"w":["注意(なければ空)"]}
+レシートが無ければ i を空にし m に理由。`;
+}
+
+// AIの短い配列形式を、アプリ内で使う形に戻す
+function normalize(raw){
+  const r = raw && typeof raw === "object" ? raw : {};
+  const SHAPE = { b:"box", c:"cylinder", s:"soft" }, TEMP = { f:"frozen", c:"chilled", r:"room" }, SEP = { r:"raw", x:"chemical" };
+  const items = (Array.isArray(r.i) ? r.i : []).filter(Array.isArray).slice(0, 60).map((a, i) => {
+    const [name, qty, w, d, h, kg, shape, flags, temp, sep, conf] = a;
+    const f = String(flags ?? "").toUpperCase();
+    return {
+      id: "i" + i, receipt: "", tip: "",
+      name: String(name ?? "商品"),
+      qty: Math.round(num(qty, 0, 30, 1)),
+      w: num(w, 0.5, 80, 10), d: num(d, 0.5, 80, 10), h: num(h, 0.5, 80, 10),
+      kg: num(kg, 0, 30, 0.3),
+      shape: SHAPE[shape] || "box",
+      fragile: f.includes("F"), upright: f.includes("U"),
+      temp: TEMP[temp] || "room",
+      separate: SEP[sep] || "none",
+      confident: Number(conf) !== 0
+    };
+  });
+  let c = null;
+  const rc = r.c;
+  if(Array.isArray(rc) && Number(rc[0]) > 0 && Number(rc[1]) > 0 && Number(rc[2]) > 0){
+    const box = rc[3] === "b";
+    c = { id:"photo", group:"写真", label: box ? "写真の箱" : "写真の袋", kind: box ? "box" : "bag",
+          W:num(rc[0], 8, 120, 30), D:num(rc[1], 5, 120, 15), H:num(rc[2], 8, 120, 28), kg: box ? 15 : 8 };
+  }
+  return { store:"", summary:String(r.m ?? ""), items, container:c,
+           warnings:(Array.isArray(r.w) ? r.w : []).map(String).filter(Boolean).slice(0, 6) };
+}
+
+// images: Blob[]（レシート → 袋・箱の順）
+async function analyze({ images, nReceipts, hasBox, signal, onText }){
+  const raw = await sample.json(buildPrompt(nReceipts, hasBox), { images, signal, onText });
+  return normalize(raw);
+}
+
+const ERR = {
+  not_granted:"Claudeの利用が許可されなかったため、解析できません。",
+  sampling_disabled:"このアカウントではClaudeを利用できません。",
+  rate_limited:"混み合っています。少し待ってから、もう一度押してください。",
+  image_rejected:"写真を読み込めませんでした。JPEGかPNGの別の写真を選んでください。",
+  images_unavailable:"この環境では写真を送れません。",
+  invalid_json:"結果をうまく読み取れませんでした。もう一度押してください。",
+  refused:"この写真は解析できませんでした。別の写真でお試しください。",
+  session_expired:"ログインが切れています。Claudeにログインし直してください。",
+  empty_completion:"結果が空でした。レシートの写真を撮り直してお試しください。"
+};
+const errorMessage = code => ERR[code] || "解析に失敗しました。通信状況を確認して、もう一度押してください。";
+
+App.ai = { init, analyze, errorMessage };
+})(window.App = window.App || {});
+</script>
+<script>
+// 袋詰めの計算（画面には触らない）
+// 高さマップ方式：袋の底を格子に区切り、各マスの「今の高さ」を記録しながら、一番低く収まる位置に置いていく
+(function(App){
+"use strict";
+const { PALETTE, STEP_TEXT } = App.config;
+
+// 1 重い・立てる物 → 2 箱物 → 3 軽い物 → 4 つぶれやすい物 → 5 日用品は別袋
+function rankOf(it){
+  if(it.separate === "chemical") return 5;
+  if(it.fragile) return 4;
+  if(it.kg >= 0.7 || it.upright) return 1;
+  if(it.shape === "soft" || it.kg < 0.2) return 3;
+  return 2;
+}
+
+// 置き方の候補。立てる物は向きを変えない（横回転だけ）
+function orientations(it){
+  const { w, d, h } = it;
+  if(it.upright) return [[w, d, h], [d, w, h]];
+  return [[w, d, h], [d, w, h], [w, h, d], [h, w, d], [d, h, w], [h, d, w]];
+}
+
+// items: 商品の配列、C: 袋・箱 { W, D, H, kg }
+// 戻り値: { C, bags, placed, colorOf, units }
+function pack(items, C){
+  const { W, D, H } = C;
+  const cell = Math.max(W, D) < 40 ? 1.5 : 2;
+  const nx = Math.max(1, Math.floor(W / cell)), nz = Math.max(1, Math.floor(D / cell));
+  const colorOf = new Map(items.map((it, i) => [it.id, PALETTE[i % PALETTE.length]]));
+  const units = [];
+  for(const it of items) for(let q = 0; q < it.qty && units.length < 80; q++)
+    units.push({ it, rank: rankOf(it), group: it.separate === "chemical" ? "chem" : "food", vol: it.w * it.d * it.h });
+  units.sort((a, b) => (a.group === b.group ? 0 : a.group === "food" ? -1 : 1) || a.rank - b.rank || b.vol - a.vol);
+
+  const bags = [], placed = [];
+  const best = (hm, it) => {
+    let r = null;
+    for(let [a, b, h] of orientations(it)){
+      a = Math.min(a, W); b = Math.min(b, D); h = Math.min(h, H * 1.2);
+      const ca = Math.min(nx, Math.ceil(a / cell - 0.01)), cb = Math.min(nz, Math.ceil(b / cell - 0.01));
+      for(let iz = 0; iz + cb <= nz; iz++) for(let ix = 0; ix + ca <= nx; ix++){
+        let base = 0;
+        for(let z = iz; z < iz + cb; z++) for(let x = ix; x < ix + ca; x++){ const v = hm[z * nx + x]; if(v > base) base = v; }
+        const score = base + h + (ix + iz) * 0.01;
+        if(!r || score < r.score) r = { score, base, ix, iz, ca, cb, a, b, h };
+      }
+    }
+    return r;
+  };
+  for(const u of units){
+    let bag = null, p = null;
+    for(const bg of bags){
+      if(bg.group !== u.group || bg.kg + u.it.kg > C.kg) continue;
+      const q = best(bg.hm, u.it);
+      if(q && q.base + q.h <= H + 0.5){ bag = bg; p = q; break; }
+    }
+    if(!bag){
+      bag = { group:u.group, hm:new Float32Array(nx * nz), kg:0, top:0, n:0 };
+      bags.push(bag); p = best(bag.hm, u.it);
+    }
+    for(let z = p.iz; z < p.iz + p.cb; z++) for(let x = p.ix; x < p.ix + p.ca; x++) bag.hm[z * nx + x] = p.base + p.h;
+    bag.kg += u.it.kg; bag.top = Math.max(bag.top, p.base + p.h); bag.n++;
+    placed.push({ bag: bags.indexOf(bag), rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, upright: u.it.upright,
+      w:p.a, d:p.b, h:p.h, x: p.ix * cell + p.a / 2 - W / 2, z: p.iz * cell + p.b / 2 - D / 2, y: p.base + p.h / 2 });
+  }
+  return { C, bags, placed, colorOf, units };
+}
+
+// 実際に出てきた段階だけを手順にする
+function buildSteps(packed){
+  const ranks = [...new Set(packed.units.map(u => u.rank))].sort((a, b) => a - b);
+  return ranks.map(r => ({ rank:r, ...STEP_TEXT[r] }));
+}
+
+App.packing = { pack, buildSteps, rankOf };
+})(window.App = window.App || {});
+</script>
+<script>
+// 3D表示（Three.js）。袋・箱と商品を描き、手順ごとに落とし込むアニメーションをする
+(function(App){
+"use strict";
+const { reduceMotion } = App.util;
+
+let renderer, scene, camera, root, stage, meshes = [], packed = null, curStep = 0;
+const view = { rotY:-0.7, tilt:0.55, dist:120, base:120, target:null };
+const ready = typeof THREE !== "undefined";
+
+// 戻り値: 3Dが使えるか
+function init(canvas, stageEl){
+  stage = stageEl;
+  if(!ready){
+    stage.insertAdjacentHTML("beforeend", '<p style="position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)">3D表示を読み込めませんでした</p>');
+    return false;
+  }
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(35, 1, 1, 3000);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a948f, 0.85));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.75); dl.position.set(60, 120, 80); scene.add(dl);
+  root = new THREE.Group(); scene.add(root);
+  new ResizeObserver(resize).observe(stage);
+
+  // ドラッグで回転（タッチは横方向だけ。縦はページのスクロールに譲る）、ホイールで拡大
+  let drag = null;
+  stage.addEventListener("pointerdown", e => { drag = { x:e.clientX, y:e.clientY }; stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener("pointermove", e => {
+    if(!drag) return;
+    view.rotY -= (e.clientX - drag.x) * 0.01;
+    if(e.pointerType === "mouse") view.tilt = Math.min(1.35, Math.max(0.05, view.tilt + (e.clientY - drag.y) * 0.008));
+    drag = { x:e.clientX, y:e.clientY };
+  });
+  ["pointerup","pointercancel"].forEach(ev => stage.addEventListener(ev, () => drag = null));
+  stage.addEventListener("wheel", e => { e.preventDefault(); view.dist = Math.min(view.base * 2.5, Math.max(view.base * 0.4, view.dist * (1 + e.deltaY * 0.001))); }, { passive:false });
+
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
+  new MutationObserver(retheme).observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
+  requestAnimationFrame(loop);
+  return true;
+}
+
+function cssColor(name){ return new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888"); }
+function resize(){
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}
+function disposeAll(){ root.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); }); root.clear(); meshes = []; }
+function retheme(){ if(ready && root) root.traverse(o => { if(o.userData.themed) o.material.color = cssColor(o.userData.themed); }); }
+
+// レジ袋：半透明の袋＋持ち手。点線は「ここまで詰めてOK」の高さ。戻り値は描いた物の一番上
+function addBag(g, C){
+  const { W, D, H } = C, BH = H * 1.3;
+  const lineC = cssColor("--bag-line"), fillC = cssColor("--bag-fill");
+  const box = new THREE.BoxGeometry(W, BH, D); box.translate(0, BH / 2, 0);
+  g.add(new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color:fillC, transparent:true, opacity:0.1, side:THREE.DoubleSide, depthWrite:false })));
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color:lineC }));
+  edges.userData.themed = "--bag-line"; g.add(edges);
+  const lim = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-W/2, H, -D/2), new THREE.Vector3(W/2, H, -D/2), new THREE.Vector3(W/2, H, D/2), new THREE.Vector3(-W/2, H, D/2)]),
+    new THREE.LineDashedMaterial({ color:lineC, dashSize:1.5, gapSize:1.2 }));
+  lim.computeLineDistances(); lim.userData.themed = "--bag-line"; g.add(lim);
+  for(const sx of [-1, 1]){
+    const hd = new THREE.Mesh(new THREE.TorusGeometry(D / 2, 0.5, 8, 32, Math.PI), new THREE.MeshBasicMaterial({ color:lineC }));
+    hd.rotation.y = Math.PI / 2; hd.position.set(sx * (W / 2 - W * 0.13), BH, 0); hd.userData.themed = "--bag-line"; g.add(hd);
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ color:lineC, transparent:true, opacity:0.18 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.05; floor.userData.themed = "--bag-line"; g.add(floor);
+  return BH + D / 2;
+}
+
+// 段ボール：茶色の箱＋開いたフタ4枚
+function addBox(g, C){
+  const { W, D, H } = C;
+  const kraft = new THREE.Color("#C49A6C"), kraftDark = new THREE.Color("#8A6440");
+  const box = new THREE.BoxGeometry(W, H, D); box.translate(0, H / 2, 0);
+  g.add(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color:kraft, transparent:true, opacity:0.22, side:THREE.DoubleSide, depthWrite:false, roughness:1 })));
+  g.add(new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color:kraftDark })));
+  const f = D / 2;
+  [[0, 0, D / 2, W], [Math.PI, 0, -D / 2, W], [Math.PI / 2, W / 2, 0, D], [-Math.PI / 2, -W / 2, 0, D]].forEach(([ry, x, z, len]) => {
+    const hinge = new THREE.Group(); hinge.position.set(x, H, z); hinge.rotation.y = ry; g.add(hinge);
+    const pg = new THREE.PlaneGeometry(len, f); pg.translate(0, f / 2, 0);
+    const flap = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ color:kraft, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false, roughness:1 }));
+    flap.rotation.x = 0.55; hinge.add(flap);
+    flap.add(new THREE.LineSegments(new THREE.EdgesGeometry(pg), new THREE.LineBasicMaterial({ color:kraftDark })));
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ color:kraft, transparent:true, opacity:0.35 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = 0.05; g.add(floor);
+  return H + f;
+}
+
+function itemGeometry(p){
+  const k = 0.95;
+  if(p.shape === "cylinder"){
+    // 円柱の軸は、いちばん長い辺の向きに合わせる
+    const axis = [p.w, p.h, p.d].indexOf(Math.max(p.w, p.h, p.d));
+    const len = Math.max(p.w, p.h, p.d) * k;
+    const geo = new THREE.CylinderGeometry(1, 1, 1, 28);
+    if(axis === 1) geo.scale(p.w / 2 * k, p.h * k, p.d / 2 * k);
+    else if(axis === 0){ geo.rotateZ(Math.PI / 2); geo.scale(len, p.h / 2 * k, p.d / 2 * k); }
+    else { geo.rotateX(Math.PI / 2); geo.scale(p.w / 2 * k, p.h / 2 * k, len); }
+    return geo;
+  }
+  if(p.shape === "soft"){ const geo = new THREE.SphereGeometry(1, 24, 16); geo.scale(p.w / 2 * k, p.h / 2 * k, p.d / 2 * k); return geo; }
+  return new THREE.BoxGeometry(p.w * k, p.h * k, p.d * k);
+}
+
+// packed: packing.pack() の結果、steps: packing.buildSteps() の結果
+function show(packedResult, steps){
+  packed = packedResult;
+  if(!ready) return;
+  disposeAll();
+  const { C, bags, placed } = packed;
+  const n = Math.max(1, bags.length), gap = C.W * 0.35, span = n * C.W + (n - 1) * gap;
+  let topY = C.H;
+  for(let b = 0; b < n; b++){
+    const g = new THREE.Group(); g.position.x = -span / 2 + C.W / 2 + b * (C.W + gap); root.add(g);
+    topY = C.kind === "box" ? addBox(g, C) : addBag(g, C);
+  }
+  placed.forEach(p => {
+    const geo = itemGeometry(p);
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color:new THREE.Color(p.color), roughness:p.shape === "soft" ? 0.95 : 0.55 }));
+    m.position.set(p.x, p.y, p.z); root.children[p.bag].add(m);
+    if(p.shape !== "soft") m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color:0x000000, transparent:true, opacity:0.25 })));
+    meshes.push({ m, step: steps.findIndex(s => s.rank === p.rank), y:p.y, t0:0 });
+  });
+  view.target = new THREE.Vector3(0, topY * 0.42, 0);
+  view.base = Math.max(span * 1.25, topY * 2.2) + 15;
+  view.dist = view.base;
+  resize();
+}
+
+// k番目の手順までを表示。animate なら k番目の商品を上から落とす
+function setStep(k, animate){
+  curStep = k;
+  if(!ready) return;
+  const now = performance.now(), drop = packed ? packed.C.H : 30;
+  for(const o of meshes){
+    o.m.visible = o.step <= k;
+    if(animate && !reduceMotion && o.step === k){ o.t0 = now; o.m.position.y = o.y + drop; }
+    else if(!o.t0) o.m.position.y = o.y;
+  }
+}
+
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!view.target) return;
+  const t = view.target;
+  camera.position.set(
+    t.x + view.dist * Math.sin(view.rotY) * Math.cos(view.tilt),
+    t.y + view.dist * Math.sin(view.tilt),
+    t.z + view.dist * Math.cos(view.rotY) * Math.cos(view.tilt));
+  camera.lookAt(t);
+  const drop = packed ? packed.C.H : 30;
+  for(const o of meshes){
+    if(!o.m.visible) continue;
+    if(o.t0){
+      const k = Math.min(1, (now - o.t0) / 650), ease = 1 - Math.pow(1 - k, 3);
+      o.m.position.y = o.y + (1 - ease) * drop;
+      if(k >= 1) o.t0 = 0;
+    }
+    const cur = o.step === curStep;
+    o.m.material.emissive.setRGB(cur ? 0.18 : 0, cur ? 0.15 : 0, cur ? 0.05 : 0);
+  }
+  renderer.render(scene, camera);
+}
+
+App.scene3d = { init, show, setStep };
+})(window.App = window.App || {});
+</script>
+<script>
+// 画面の操作と表示（入力欄、袋の選択、結果の一覧・手順・統計）
+(function(App){
+"use strict";
+const { $, el, fmt, reduceMotion } = App.util;
+const { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf } = App.config;
+
+const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
+let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null;
+const container = () => state.containerId === "photo" && state.photoContainer ? state.photoContainer : PRESETS.find(p => p.id === state.containerId);
+
+// ---------- 袋・箱の選択 ----------
+function renderContainerSeg(){
+  const host = $("containerSeg"); host.textContent = "";
+  const groups = [["レジ袋", PRESETS.filter(p => p.group === "レジ袋")], ["段ボール（3辺合計cm）", PRESETS.filter(p => p.group === "段ボール")]];
+  if(state.photoContainer) groups.unshift(["写真から測った大きさ", [state.photoContainer]]);
+  for(const [title, list] of groups){
+    const g = el("div", "seggroup");
+    const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", title);
+    for(const p of list){
+      const b = el("button", null, p.label); b.type = "button";
+      b.setAttribute("aria-pressed", String(p.id === state.containerId));
+      b.append(el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`));
+      b.onclick = () => { state.containerId = p.id; renderContainerSeg(); renderPack(); };
+      seg.append(b);
+    }
+    g.append(el("span", "sub", title), seg); host.append(g);
+  }
+}
+
+// ---------- 写真 ----------
+const maxTotal = () => imgLimits?.maxCount ?? 4;
+function wirePhotos(input, dz, key, thumbs, cap){
+  const add = async list => {
+    for(const f of [...list]){
+      if(!f.type.startsWith("image/")) continue;
+      if(key === "boxPhoto") state.boxPhoto = [];
+      if(state[key].length >= cap() || state.receipts.length + state.boxPhoto.length >= maxTotal()) break;
+      try{
+        setStatus("写真を軽くしています…");
+        state[key].push(await App.imagePrep.prepImage(f, key === "receipts" ? "receipt" : "box"));
+      }catch{
+        setStatus("この写真は読み込めませんでした。JPEGかPNGの写真を選んでください。", true); return;
+      }
+    }
+    draw();
+  };
+  const draw = () => {
+    const t = $(thumbs); t.textContent = "";
+    state[key].forEach((f, i) => {
+      const d = el("div", "thumb");
+      const img = document.createElement("img"); img.src = URL.createObjectURL(f.blob); img.alt = (key === "receipts" ? "レシート" : "袋・箱") + (i + 1);
+      img.onload = () => URL.revokeObjectURL(img.src);
+      const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", img.alt + "を外す");
+      x.onclick = () => { state[key].splice(i, 1); draw(); };
+      d.append(img, x); t.append(d);
+    });
+    syncGo();
+  };
+  input.addEventListener("change", e => { add(e.target.files); e.target.value = ""; });
+  ["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); }));
+  dz.addEventListener("drop", e => add(e.dataTransfer.files));
+}
+
+function setStatus(msg, err){ const s = $("status"); s.textContent = msg; s.classList.toggle("err", !!err); }
+function syncGo(updateStatus = true){
+  const busy = !!ctl;
+  $("goBtn").disabled = busy || !aiReady || !imgLimits || state.receipts.length === 0;
+  if(busy || !updateStatus) return;
+  if(!aiReady) setStatus("このページをClaudeの画面で開くと、レシートを解析できます");
+  else if(!imgLimits) setStatus("この環境では写真を送れません", true);
+  else if(!state.receipts.length) setStatus("レシートを選ぶと解析できます");
+  else{
+    const all = [...state.receipts, ...state.boxPhoto];
+    const tok = all.reduce((a, p) => a + p.tokens, 0), orig = all.reduce((a, p) => a + p.origTokens, 0);
+    const kb = Math.round(all.reduce((a, p) => a + p.bytes, 0) / 1024), okb = Math.round(all.reduce((a, p) => a + p.origBytes, 0) / 1024);
+    setStatus(`レシート${state.receipts.length}枚${state.boxPhoto.length ? "と袋・箱の写真" : ""}を解析できます（画像 約${tok.toLocaleString()}トークン・${kb.toLocaleString()}KB。加工前は約${orig.toLocaleString()}トークン・${okb.toLocaleString()}KB）`);
+  }
+}
+
+// ---------- 解析 ----------
+async function onSubmit(e){
+  e.preventDefault();
+  if(!aiReady || !state.receipts.length || ctl) return;
+  ctl = new AbortController();
+  $("goBtn").disabled = true; $("stopBtn").hidden = false;
+  setStatus("レシートを読んでいます…（30秒〜1分ほどかかります）");
+  try{
+    const data = await App.ai.analyze({
+      images: [...state.receipts, ...state.boxPhoto].map(p => p.blob),
+      nReceipts: state.receipts.length, hasBox: state.boxPhoto.length > 0, signal: ctl.signal,
+      onText: ({ text }) => setStatus("商品の大きさを調べています… " + text.length + "字")
+    });
+    if(!data.items.length){ setStatus(data.summary || "商品を読み取れませんでした。レシート全体が写るように撮り直してください。", true); }
+    else{
+      state.data = data; state.isSample = false;
+      if(data.container){ state.photoContainer = data.container; state.containerId = "photo"; }
+      renderAll();
+      setStatus("できました。下の3Dで順番を確認してください");
+      $("banner").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
+    }
+  }catch(err){
+    if(err?.code === "cancelled") setStatus("止めました");
+    else setStatus(App.ai.errorMessage(err?.code), true);
+  }finally{
+    ctl = null; $("stopBtn").hidden = true; syncGo(false);
+  }
+}
+
+// ---------- 手順の再生 ----------
+function setStep(k, animate){
+  const n = steps.length;
+  state.step = Math.max(0, Math.min(n - 1, k));
+  App.scene3d.setStep(state.step, animate);
+  document.querySelectorAll(".stepbtn").forEach((b, i) => b.setAttribute("aria-current", i === state.step ? "step" : "false"));
+  $("stepnow").textContent = n ? `手順 ${state.step + 1} / ${n}` : "";
+}
+function stopPlay(){ clearInterval(playTimer); playTimer = null; $("playBtn").textContent = "最初から再生"; }
+function wirePlayback(){
+  $("playBtn").onclick = () => {
+    if(playTimer){ stopPlay(); return; }
+    setStep(0, true); $("playBtn").textContent = "一時停止";
+    playTimer = setInterval(() => {
+      if(state.step >= steps.length - 1){ stopPlay(); return; }
+      setStep(state.step + 1, true);
+    }, 1600);
+  };
+  $("prevBtn").onclick = () => { stopPlay(); setStep(state.step - 1, false); };
+  $("nextBtn").onclick = () => { stopPlay(); setStep(state.step + 1, true); };
+}
+
+// ---------- 結果の表示 ----------
+function flagsOf(it){
+  const f = [];
+  if(it.kg >= 0.7) f.push(["重い", ""]);
+  if(it.upright) f.push(["立てる", ""]);
+  if(it.fragile) f.push(["つぶれやすい", ""]);
+  if(it.temp === "frozen") f.push(["冷凍", "cold"]);
+  if(it.temp === "chilled") f.push(["冷蔵", "cold"]);
+  if(it.separate === "raw") f.push(["ポリ袋に", "warn"]);
+  if(it.separate === "chemical") f.push(["食品と別の袋", "warn"]);
+  return f;
+}
+
+// 買った物の一覧。数字を直すと renderPack() で詰め直す（一覧自体は作り直さないので入力中のフォーカスが外れない）
+function renderTable(){
+  const tb = $("itemRows"); tb.textContent = "";
+  const colorOf = new Map(state.data.items.map((it, i) => [it.id, PALETTE[i % PALETTE.length]]));
+  state.data.items.forEach((it, idx) => {
+    const tr = el("tr");
+    const nameTd = el("td");
+    const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = colorOf.get(it.id); c.append(sw, it.name);
+    nameTd.append(c);
+    if(!it.confident) nameTd.append(el("span", "guess", "推測"));
+    if(it.receipt) nameTd.append(el("span", "rc", it.receipt));
+    const numIn = (key, cls, step, label) => {
+      const inp = document.createElement("input"); inp.type = "number"; inp.id = `f-${key}-${idx}`; inp.className = cls || "";
+      inp.min = "0"; inp.step = step; inp.value = String(it[key]); inp.setAttribute("aria-label", `${it.name}の${label}`);
+      inp.addEventListener("change", () => {
+        const v = Number(inp.value);
+        if(!Number.isFinite(v) || v < 0){ inp.value = String(it[key]); return; }
+        it[key] = key === "qty" ? Math.round(Math.min(v, 30)) : key === "kg" ? Math.min(v, 30) : Math.max(0.5, Math.min(v, 80));
+        inp.value = String(it[key]);
+        renderPack();
+      });
+      return inp;
+    };
+    const qTd = el("td"); qTd.append(numIn("qty", "q", "1", "個数"));
+    const dTd = el("td"); const dims = el("div", "dims");
+    dims.append(numIn("w", "", "0.5", "幅"), "×", numIn("d", "", "0.5", "奥行き"), "×", numIn("h", "", "0.5", "高さ"));
+    dTd.append(dims);
+    const kTd = el("td"); kTd.append(numIn("kg", "", "0.05", "重さ"));
+    const fTd = el("td");
+    flagsOf(it).forEach(([t, cls]) => fTd.append(el("span", "flag" + (cls ? " " + cls : ""), t)));
+    if(it.tip) fTd.append(el("div", "tip", it.tip));
+    tr.append(nameTd, qTd, dTd, kTd, fTd);
+    tb.append(tr);
+  });
+}
+
+function renderPack(){
+  stopPlay();
+  const d = state.data, C = container();
+  const items = d.items.filter(it => it.qty > 0);
+  const packed = App.packing.pack(items, C);
+  steps = App.packing.buildSteps(packed);
+
+  $("banner").hidden = !state.isSample;
+  $("store").textContent = d.store;
+  $("summary").textContent = d.summary;
+
+  // 統計
+  const totalKg = packed.units.reduce((a, u) => a + u.it.kg, 0);
+  const maxBag = packed.bags.reduce((a, b) => Math.max(a, b.kg), 0);
+  const unit = C.kind === "box" ? "箱" : "袋";
+  const st = $("stats"); st.textContent = "";
+  const stat = (k, v, u, bad) => { const s = el("div", "stat"); const vv = el("span", "v" + (bad ? " bad" : ""), v); if(u) vv.append(el("small", null, u)); s.append(vv, el("span", "k", k)); st.append(s); };
+  stat("商品", String(packed.units.length), "点");
+  stat("合計の重さ", fmt(totalKg), "kg");
+  stat(nameOf(C), String(packed.bags.length), unit);
+  stat("いちばん重い" + unit, fmt(maxBag), "kg", maxBag > C.kg);
+
+  // 3Dの上に出す袋ごとの札
+  const bt = $("bagtags"); bt.textContent = "";
+  packed.bags.forEach((b, i) => {
+    const pct = Math.round(b.top / C.H * 100);
+    const over = pct > 100 || b.kg > C.kg;
+    bt.append(el("span", "bagtag" + (over ? " over" : ""), `${i + 1}${unit}目 ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
+  });
+  if(C.kind === "bag") bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
+
+  // 手順
+  const ol = $("steps"); ol.textContent = "";
+  steps.forEach((s, k) => {
+    const li = el("li"); const b = el("button", "stepbtn"); b.type = "button";
+    const body = el("div");
+    body.append(el("h3", null, s.title), el("p", null, s.detail));
+    const chips = el("div", "chips"); const seen = new Set();
+    packed.units.filter(u => u.rank === s.rank).forEach(u => {
+      if(seen.has(u.it.id)) return; seen.add(u.it.id);
+      const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = packed.colorOf.get(u.it.id);
+      c.append(sw, u.it.name + (u.it.qty > 1 ? " ×" + u.it.qty : "")); chips.append(c);
+    });
+    body.append(chips);
+    b.append(el("span", "n", String(k + 1)), body);
+    b.onclick = () => { stopPlay(); setStep(k, true); };
+    li.append(b); ol.append(li);
+  });
+
+  // 注意
+  const warns = [...d.warnings];
+  if(items.some(i => i.temp !== "room")) warns.push("冷凍・冷蔵品は同じ袋の中で隣どうしに入れると、冷たさが長持ちします。");
+  if(items.some(i => i.separate === "raw")) warns.push("肉・魚は、サッカー台のポリ袋に入れてから詰めると汁がもれません。");
+  if(maxBag > C.kg) warns.push(`1つの${unit}が目安の${C.kg}kgを超えます。重い物を分けるか、大きい${unit}を選んでください。`);
+  $("warnSec").hidden = !warns.length;
+  const wl = $("warnList"); wl.textContent = "";
+  warns.forEach(w => wl.append(el("li", null, w)));
+
+  App.scene3d.show(packed, steps);
+  setStep(steps.length - 1, false);
+}
+
+function renderAll(){ renderContainerSeg(); renderTable(); renderPack(); }
+
+async function start(){
+  App.scene3d.init($("cv"), $("stage"));
+  wirePhotos($("receiptInput"), $("dzReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
+  wirePhotos($("boxInput"), $("dzBox"), "boxPhoto", "boxThumbs", () => 1);
+  $("intake").addEventListener("submit", onSubmit);
+  $("stopBtn").onclick = () => ctl?.abort();
+  wirePlayback();
+  renderAll();
+
+  const ai = await App.ai.init();
+  aiReady = ai.available; imgLimits = ai.imgLimits;
+  if(imgLimits){ const acc = imgLimits.mediaTypes.join(","); $("receiptInput").accept = acc; $("boxInput").accept = acc; }
+  syncGo();
+}
+
+App.ui = { start };
+})(window.App = window.App || {});
+</script>
+<script>
+// 起動
+App.ui.start();
+</script>
