@@ -206,6 +206,17 @@ footer{font-size:12px;color:var(--muted)}
 .bp-list[hidden]{display:none}
 .bp-list .seggroup:first-child{margin-top:8px}
 
+/* 画面上部に固定する「袋づめ名人」（最初の画面以外）。押すと最初の画面へ */
+.topbar{display:none}
+.wrap:not(.intro) .topbar{display:flex;position:fixed;top:0;left:0;right:0;z-index:50;align-items:center;gap:10px;padding:8px max(20px,calc((100vw - 1120px)/2 + 20px));border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-family:var(--display);font-size:20px;letter-spacing:.02em;text-align:left;cursor:pointer}
+.topbar .logo{width:30px;height:30px}
+.topbar:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.wrap:not(.intro){padding-top:76px}
+.wrap:not(.intro) header .brand{display:none}
+.wrap:not(.intro) header{margin-top:-8px}
+/* 結果の画面では入力欄を隠す */
+.wrap:not(.intro):not(.setup) .intake{display:none}
+
 /* 撮ったあとの画面：レシートの確認と、袋・箱の選択だけを出す */
 .wrap.setup > *:not(header):not(.intake){display:none}
 .wrap.setup .tag{display:none}
@@ -271,3 +282,9 @@ footer{font-size:12px;color:var(--muted)}
 }
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.head,.intake{scroll-margin-top:64px}
+.banner[hidden]{display:none}
+/* 結果の画面では「レシートを撮る」も隠す（撮り直しは上の「袋づめ名人」から） */
+.wrap:not(.intro):not(.setup) .start{display:none}
+/* 結果の画面では説明文も隠す */
+.wrap:not(.intro):not(.setup) .tag{display:none}

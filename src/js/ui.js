@@ -530,6 +530,7 @@ async function start(){
   wirePhotos($("receiptPick"), $("heroPick"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
   const toSample = () => { setScreen("result"); window.scrollTo({ top:0 }); };
   $("skipIntro").onclick = toSample;
+  $("homeBtn").onclick = () => { setScreen("intro"); window.scrollTo({ top:0 }); };
   $("showSample").onclick = toSample;
   wirePhotos($("boxInput"), $("dzBox"), "boxPhoto", "boxThumbs", () => 1);
   $("intake").addEventListener("submit", onSubmit);

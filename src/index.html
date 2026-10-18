@@ -14,6 +14,15 @@
 
 <!-- 画面は3段階：intro（「レシートを撮る」だけ）→ setup（レシートの確認と袋・箱の選択）→ クラスなし（結果） -->
 <div class="wrap intro" id="app">
+  <!-- 画面の上に固定。押すと最初の画面に戻る（最初の画面では大きな見出しがあるので出さない） -->
+  <button type="button" class="topbar" id="homeBtn" aria-label="最初の画面に戻る">
+    <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+      <path d="M8 16 L36 16 L33 40 L11 40 Z" fill="var(--accent)" />
+      <path d="M15 16 C15 8 20 6 22 11 C24 6 29 8 29 16" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="22" cy="13" r="2.6" fill="var(--ink)"/>
+    </svg>
+    <span>袋詰名人</span>
+  </button>
   <header>
     <div class="brand">
       <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
@@ -21,7 +30,7 @@
         <path d="M15 16 C15 8 20 6 22 11 C24 6 29 8 29 16" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
         <circle cx="22" cy="13" r="2.6" fill="var(--ink)"/>
       </svg>
-      <h1>袋づめ名人</h1>
+      <h1>袋詰名人</h1>
     </div>
     <p class="tag">レシートを撮るだけ。買った物をどの順で、どの袋に詰めればいいか、3Dで先に見せます。</p>
   </header>
