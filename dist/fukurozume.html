@@ -2365,7 +2365,7 @@ async function onSubmit(e){
   if(!aiReady || !state.receipts.length || ctl) return;
   ctl = new AbortController();
   $("goBtn").disabled = true; $("stopBtn").hidden = false;
-  setStatus("レシートを読んでいます…（30秒〜1分ほどかかります）");
+  setStatus("レシートを読んでいます…");
   try{
     const data = await App.ai.analyze({
       images: [...state.receipts, ...state.boxPhoto].map(p => p.blob),
