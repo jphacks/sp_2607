@@ -142,6 +142,19 @@ footer{font-size:12px;color:var(--muted)}
 .seg .mybag > button.del.armed{background:var(--warn);border-color:var(--warn);color:#fff}
 .seg button.add{border-style:dashed;color:var(--muted)}
 .seg button.add:hover{color:var(--ink);border-color:var(--ink)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+
+/* 袋の数・種類を決めたとき：決めた袋の一覧と、選択肢に付く「×2」 */
+.seg .slot{display:inline-flex;align-items:center;font-size:14px;padding:6px 12px;border-radius:999px 0 0 999px;border:1px solid var(--ink);border-right:0;background:var(--ink);color:var(--ground)}
+.seg .slot small{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px}
+.seg .mybag > .slot + button.del{border-color:var(--ink)}
+.seg button .cnt{font-family:var(--mono);font-size:11px;font-weight:700;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--accent-ink)}
+
+/* 入りきらなかった物 */
+.leftover{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--warn);background:var(--surface)}
+.leftover[hidden]{display:none}
+.leftover .label{color:var(--warn)}
+.leftnote{margin:0;font-size:13px;color:var(--muted)}
 .bagform{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:var(--sunk);border:1px solid var(--line)}
 .bf-field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .bf-field label{font-size:12px;font-weight:700;color:var(--muted)}
@@ -389,6 +402,12 @@ footer{font-size:12px;color:var(--muted)}
       </div>
     </div>
     <div>
+      <!-- 袋の数・種類を決めたとき、入りきらなかった物 -->
+      <div class="leftover" id="leftSec" hidden>
+        <h2 class="label">入りきらなかった物</h2>
+        <div class="chips" id="leftList"></div>
+        <p class="leftnote" id="leftNote"></p>
+      </div>
       <h2 class="label" style="margin-bottom:4px">詰める順番</h2>
       <p class="steps-lead">かごの上の方（レシートの下の方）にある商品から、なるべく順に取り出せる並びにしています。</p>
       <ol class="steps" id="steps"></ol>
@@ -483,7 +502,8 @@ const STEP_TEXT = {
 const PACKING = {
   anneal: true, iters: 500, slackBag: 5, slackBox: 0, mixChem: true,
   weights: {
-    bags: 1000,      // 袋の数（個）
+    bags: 1000,      // 袋の数（個）。袋の数・種類を指定したときは数えない
+    left: 1000,      // 袋を指定したとき、入りきらずに余った商品（個）
     overflow: 60,    // はみ出してよい高さを超えた分（cm）
     overweight: 200, // 耐荷重を超えた重さ（kg）
     balance: 20,     // 食品の袋どうしの重さの差（kg）
@@ -856,10 +876,12 @@ App.ai = { init, analyze, errorMessage };
 //    「上面の高さ ＋ 足元の隙間 − 壁や隣との接触」が一番小さい位置に置いていく（pack）
 // 3. 磨く：評価関数（袋の数・重さの偏り・重い物の高さ…）が小さくなるよう、商品を別の袋に移す・向きを変える、を
 //    焼きなまし法で何百回も試す（improve）。入れる順番は 1 のまま変えない
+// 袋の使い方は2通り：
+//   おまかせ … 同じ袋・箱を、全部入るまで必要なだけ使う
+//   袋を指定 … 決めた数・種類の袋だけを使う。入りきらない物は「余り」として返す（余りが少ないほど良い）
 (function(App){
 "use strict";
 const { PALETTE, STEP_TEXT, KINDS, PACKING } = App.config;
-
 // 一覧の色見本と3Dの色をそろえる。種類が分かればその種類の色
 const colorFor = (it, i) => KINDS[it.kind]?.color || PALETTE[i % PALETTE.length];
 
@@ -935,12 +957,10 @@ function orderUnits(units){
   return out;
 }
 
+
 // ---------- 置く場所 ----------
-// 計算に使う道具一式：袋の寸法、格子、商品（入れる順）、はみ出してよい高さ
-function makeContext(items, C){
-  const { W, D } = C;
-  const cell = Math.max(W, D) < 40 ? 1.5 : 2;
-  const nx = Math.max(1, Math.floor(W / cell)), nz = Math.max(1, Math.floor(D / cell));
+// 計算に使う道具一式：商品（入れる順）、おまかせのときの袋 C、指定した袋の一覧 fixed（おまかせなら null）
+function makeContext(items, C, fixed){
   const colorOf = new Map(items.map((it, i) => [it.id, colorFor(it, i)]));
   const raw = [];
   // group: 入れる順番のルールを比べる相手。日用品を食品と同じ袋に入れてよいなら、日用品も食品と比べて最後に回す
@@ -952,15 +972,20 @@ function makeContext(items, C){
   });
   const units = orderUnits(raw);
   units.forEach((u, i) => u.i = i);
-  // 袋は持ち手を結べるので、口から少しならはみ出してよい。箱はフタが閉まらなくなるので許さない
-  const slack = C.kind === "box" ? PACKING.slackBox : PACKING.slackBag;
-  return { C, cell, nx, nz, units, colorOf, slack };
+  return { C, units, colorOf, fixed: fixed && fixed.length ? fixed : null };
 }
 
-// 袋ごとに2枚の地図を持つ：hm＝各マスの今の高さ、lim＝各マスの一番上に、あと何kgまで載せてよいか
-const newBag = (X, group) => ({ group, hm: new Float32Array(X.nx * X.nz), lim: new Float32Array(X.nx * X.nz).fill(Infinity), kg: 0, top: 0, list: [] });
-// 日用品を食品と同じ袋に入れてよいなら、袋の区別はしない
-const bagGroupOf = u => PACKING.mixChem ? "all" : u.group;
+// 袋1つ。袋ごとに大きさが違ってよいので、格子も袋ごとに持つ
+// 2枚の地図：hm＝各マスの今の高さ、lim＝各マスの一番上に、あと何kgまで載せてよいか
+// slack: 口から何cmまではみ出してよいか（袋は持ち手を結べるので少しならよい。箱はフタが閉まらなくなるので許さない）
+function newBag(group, C){
+  const cell = Math.max(C.W, C.D) < 40 ? 1.5 : 2;
+  const nx = Math.max(1, Math.floor(C.W / cell)), nz = Math.max(1, Math.floor(C.D / cell));
+  return { group, C, cell, nx, nz, slack: C.kind === "box" ? PACKING.slackBox : PACKING.slackBag,
+    hm: new Float32Array(nx * nz), lim: new Float32Array(nx * nz).fill(Infinity), kg: 0, top: 0, list: [], spill: [] };
+}
+// 日用品を食品と同じ袋に入れてよいなら、袋の区別はしない（袋を指定したときも区別しない）
+const bagGroupOf = (X, u) => PACKING.mixChem || X.fixed ? "all" : u.group;
 
 // 幅 ca × 奥行 cb の窓の中の最大（または最小）を、全部の位置について求める（行→列の2段で計算を減らす）
 function windowReduce(a, nx, nz, ca, cb, useMax){
@@ -1002,8 +1027,8 @@ function contact(hm, nx, nz, ix, iz, ca, cb, base, h){
 //   ignoreLim: false なら、下の物が耐えられない場所には置かない（置き場所が無ければ null）
 //              true なら、耐えられない重さが一番小さい場所を選ぶ（ほかに置き場所がないときの逃げ道）
 const GAP_W = 1.2, CONTACT_MAX = 4;
-function find(X, bag, u, rot, ignoreLim){
-  const { C, cell, nx, nz } = X, { hm, lim } = bag, kg = u.it.kg;
+function find(bag, u, rot, ignoreLim){
+  const { C, cell, nx, nz, hm, lim } = bag, kg = u.it.kg;
   const ors = orientations(u.it), list = rot >= 0 && rot < ors.length ? [rot] : ors.map((_, o) => o);
   const ps = prefix(hm, nx, nz);
   let r = null;
@@ -1027,8 +1052,11 @@ function find(X, bag, u, rot, ignoreLim){
   return r;
 }
 
-function commit(X, bag, u, r){
-  const { cell, nx } = X, top = r.base + r.h, n = r.ca * r.cb;
+// その置き方で袋に収まるか（口からのはみ出しが許す高さ以内、重さが耐荷重以内）
+const fits = (bag, u, r) => !!r && r.base + r.h <= bag.C.H + bag.slack + 0.5 && bag.kg + u.it.kg <= bag.C.kg + 1e-6;
+
+function commit(bag, u, r){
+  const { cell, nx } = bag, top = r.base + r.h, n = r.ca * r.cb;
   // 置いた物の上に載せてよい重さ＝「この商品自身の上限」と「下の物の残りの上限から、この商品の重さを引いた分」の小さい方
   const nextLim = Math.min(u.lim, r.minLim - u.it.kg);
   let dead = 0, sup = 0;
@@ -1042,29 +1070,41 @@ function commit(X, bag, u, r){
   bag.list.push({ u, r, x0, x1: x0 + r.a, z0, z1: z0 + r.b, y0: r.base, y1: top,
     dead: dead * cell * cell, support: r.base < 0.5 ? 1 : sup / n, over: Math.max(0, u.it.kg - r.minLim) });
 }
-const placeIn = (X, bag, u, rot) => commit(X, bag, u, find(X, bag, u, rot, false) || find(X, bag, u, rot, true));
+// 袋に入れる。strict（袋を指定したとき）なら、収まらない物は入れずに spill（余り）へ回す
+function placeIn(bag, u, rot, strict){
+  const r = find(bag, u, rot, false) || find(bag, u, rot, true);
+  if(strict && !fits(bag, u, r)){ bag.spill.push(u); return false; }
+  commit(bag, u, r); return true;
+}
 
-// 最初の詰め方：入れる順に、入る袋のうち最初の袋へ（first-fit）。入らなければ袋を増やす
+// 最初の詰め方：入れる順に、入る袋のうち最初の袋へ（first-fit）
+//   おまかせ … 入らなければ袋を増やす
+//   袋を指定 … どの袋にも入らなければ余り（袋の番号 -1）
 function greedy(X){
-  const { C, units, slack } = X;
-  const bag = new Array(units.length), bagGroup = [], states = [];
+  const { units } = X;
+  const bag = new Array(units.length).fill(-1), bagGroup = [], Cs = [], states = [];
+  if(X.fixed) for(const C of X.fixed){ states.push(newBag("all", C)); bagGroup.push("all"); Cs.push(C); }
   for(const u of units){
     let k = -1, r = null;
     for(let j = 0; j < states.length; j++){
-      if(bagGroup[j] !== bagGroupOf(u) || states[j].kg + u.it.kg > C.kg) continue;
-      const q = find(X, states[j], u, -1, false);
-      if(q && q.base + q.h <= C.H + slack + 0.5){ k = j; r = q; break; }
+      if(bagGroup[j] !== bagGroupOf(X, u)) continue;
+      const q = find(states[j], u, -1, false);
+      if(fits(states[j], u, q)){ k = j; r = q; break; }
     }
-    if(k < 0){ k = states.length; states.push(newBag(X, bagGroupOf(u))); bagGroup.push(bagGroupOf(u)); r = find(X, states[k], u, -1, false) || find(X, states[k], u, -1, true); }
-    commit(X, states[k], u, r); bag[u.i] = k;
+    if(k < 0){
+      if(X.fixed) continue;
+      k = states.length; states.push(newBag(bagGroupOf(X, u), X.C)); bagGroup.push(bagGroupOf(X, u)); Cs.push(X.C);
+      r = find(states[k], u, -1, false) || find(states[k], u, -1, true);
+    }
+    commit(states[k], u, r); bag[u.i] = k;
   }
-  return { sol: { bag, rot: new Array(units.length).fill(-1), bagGroup }, bags: states };
+  return { sol: { bag, rot: new Array(units.length).fill(-1), bagGroup, Cs }, bags: states };
 }
 
 // 解（どの商品をどの袋に・どの向きで）から袋を組み立てる。袋どうしは独立なので1袋ずつ作れる
 function buildBag(X, sol, k){
-  const b = newBag(X, sol.bagGroup[k]);
-  for(const u of X.units) if(sol.bag[u.i] === k) placeIn(X, b, u, sol.rot[u.i]);
+  const b = newBag(sol.bagGroup[k], sol.Cs[k]);
+  for(const u of X.units) if(sol.bag[u.i] === k) placeIn(b, u, sol.rot[u.i], !!X.fixed);
   return b;
 }
 
@@ -1072,10 +1112,10 @@ function buildBag(X, sol, k){
 const overlap = (p, q) => p.x0 < q.x1 - 0.3 && q.x0 < p.x1 - 0.3 && p.z0 < q.z1 - 0.3 && q.z0 < p.z1 - 0.3;
 
 // 袋1つ分の項目
-function bagTerms(X, bag){
-  const { C, slack } = X, H = C.H, ps = bag.list;
+function bagTerms(bag){
+  const { C, slack } = bag, H = C.H, ps = bag.list;
   const nChem = ps.filter(p => p.u.chem).length;
-  const t = { n: ps.length, food: ps.length - nChem, kg: bag.kg, cold: false,
+  const t = { n: ps.length, food: ps.length - nChem, kg: bag.kg, cap: C.kg, cold: false, spill: bag.spill.length,
     overflow: Math.max(0, bag.top - H - slack), overweight: Math.max(0, bag.kg - C.kg),
     cog: 0, dead: 0, support: 0, crush: 0, raw: 0, mix: ps.length > nChem ? nChem : 0 };
   for(const p of ps){
@@ -1090,18 +1130,24 @@ function bagTerms(X, bag){
 }
 
 // 全体の点数。q は各項目の量、total は 量 × 重み（config.js の PACKING.weights）の合計
-function score(terms, W){
+//   unplaced: どの袋にも割り当てていない商品の数（袋を指定したときの余り）
+//   袋どうしの重さの差は「耐荷重に対する割合」の差 × 平均の耐荷重。同じ袋ばかりなら、ただの重さの差と同じ
+function score(terms, W, unplaced = 0){
   const used = terms.filter(t => t.n > 0), food = used.filter(t => t.food > 0);
-  const sum = k => used.reduce((s, t) => s + t[k], 0);
+  const sum = k => terms.reduce((s, t) => s + t[k], 0);
+  const ratio = food.map(t => t.kg / t.cap), capAvg = food.reduce((s, t) => s + t.cap, 0) / Math.max(1, food.length);
   const q = {
-    bags: used.length, overflow: sum("overflow"), overweight: sum("overweight"),
-    balance: food.length > 1 ? Math.max(...food.map(t => t.kg)) - Math.min(...food.map(t => t.kg)) : 0,
+    bags: used.length, left: unplaced + sum("spill"), overflow: sum("overflow"), overweight: sum("overweight"),
+    balance: food.length > 1 ? (Math.max(...ratio) - Math.min(...ratio)) * capAvg : 0,
     cog: sum("cog"), dead: sum("dead"), support: sum("support"), crush: sum("crush"),
     cold: Math.max(0, used.filter(t => t.cold).length - 1), raw: sum("raw"), mix: sum("mix")
   };
   let total = 0; for(const k in q) total += q[k] * (W[k] || 0);
   return { total, q };
 }
+// 袋を指定したときは、袋の数は決まっているので数えない
+const weightsFor = X => X.fixed ? { ...PACKING.weights, bags: 0 } : PACKING.weights;
+const countUnplaced = sol => sol.bag.reduce((s, b) => s + (b < 0), 0);
 
 // ---------- 焼きなまし ----------
 function mulberry32(a){
@@ -1111,30 +1157,34 @@ function mulberry32(a){
 // 乱数の種は商品と袋から作る。同じレシート・同じ袋なら毎回同じ詰め方になる
 function seedFrom(X){
   let h = 2166136261;
-  const s = JSON.stringify([X.units.map(u => [u.it.name, u.it.w, u.it.d, u.it.h, u.it.kg]), X.C.W, X.C.D, X.C.H, X.C.kg]);
+  const bags = (X.fixed || [X.C]).map(C => [C.W, C.D, C.H, C.kg]);
+  const s = JSON.stringify([X.units.map(u => [u.it.name, u.it.w, u.it.d, u.it.h, u.it.kg]), bags]);
   for(let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0;
 }
-const cloneSol = s => ({ bag: s.bag.slice(), rot: s.rot.slice(), bagGroup: s.bagGroup.slice() });
+const cloneSol = s => ({ bag: s.bag.slice(), rot: s.rot.slice(), bagGroup: s.bagGroup.slice(), Cs: s.Cs.slice() });
 
 function createAnnealer(X, init, { iters, seed, W }){
   const rnd = mulberry32(seed), U = X.units, n = U.length;
   const sol = cloneSol(init);
-  for(const g of new Set(sol.bagGroup)) sol.bagGroup.push(g); // 新しい袋を開けられるよう、空の袋を1つずつ足す
-  const bags = sol.bagGroup.map((_, k) => buildBag(X, sol, k)), terms = bags.map(b => bagTerms(X, b));
-  let cur = score(terms, W);
+  // おまかせのときは、新しい袋を開けられるよう、空の袋を1つずつ足しておく
+  if(!X.fixed) for(const g of new Set(sol.bagGroup)){ sol.bagGroup.push(g); sol.Cs.push(X.C); }
+  const bags = sol.bagGroup.map((_, k) => buildBag(X, sol, k)), terms = bags.map(bagTerms);
+  let cur = score(terms, W, countUnplaced(sol));
   const start = cur.total;
   let best = { ...cur, sol: cloneSol(sol), bags: bags.slice() };
   const pick = a => a[Math.floor(rnd() * a.length)];
+  const groupOfBag = k => k < 0 ? null : sol.bagGroup[k];
 
-  // 近くの解を1つ作る。戻り値: 触った袋と、元に戻す関数
+  // 近くの解を1つ作る。戻り値: 触った袋と、元に戻す関数。袋の番号 -1 は余り（袋を指定したときだけ使う）
   function propose(){
-    const r = rnd(), i = Math.floor(rnd() * n), g = bagGroupOf(U[i]);
-    if(r < 0.45){ // 別の袋に移す
+    const r = rnd(), i = Math.floor(rnd() * n), g = bagGroupOf(X, U[i]);
+    if(r < 0.45){ // 別の袋（または余り）に移す
       const c = []; sol.bagGroup.forEach((bg, k) => { if(bg === g && k !== sol.bag[i]) c.push(k); });
+      if(X.fixed && sol.bag[i] >= 0) c.push(-1);
       if(c.length){ const from = sol.bag[i], to = pick(c); sol.bag[i] = to; return { touched: [from, to], undo: () => { sol.bag[i] = from; } }; }
-    } else if(r < 0.75){ // 違う袋の2個を入れ替える
-      const c = []; for(let j = 0; j < n; j++) if(bagGroupOf(U[j]) === g && sol.bag[j] !== sol.bag[i]) c.push(j);
+    } else if(r < 0.75){ // 違う袋（または余り）の2個を入れ替える
+      const c = []; for(let j = 0; j < n; j++) if(bagGroupOf(X, U[j]) === g && sol.bag[j] !== sol.bag[i]) c.push(j);
       if(c.length){ const j = pick(c), a = sol.bag[i], b = sol.bag[j]; sol.bag[i] = b; sol.bag[j] = a;
         return { touched: [a, b], undo: () => { sol.bag[i] = a; sol.bag[j] = b; } }; }
     }
@@ -1145,10 +1195,10 @@ function createAnnealer(X, init, { iters, seed, W }){
   }
   // 動かして、触った袋だけ作り直して採点する
   function trial(){
-    const mv = propose(), ks = [...new Set(mv.touched)];
+    const mv = propose(), ks = [...new Set(mv.touched)].filter(k => k >= 0);
     const oldB = ks.map(k => bags[k]), oldT = ks.map(k => terms[k]);
-    for(const k of ks){ bags[k] = buildBag(X, sol, k); terms[k] = bagTerms(X, bags[k]); }
-    const nx = score(terms, W);
+    for(const k of ks){ bags[k] = buildBag(X, sol, k); terms[k] = bagTerms(bags[k]); }
+    const nx = score(terms, W, countUnplaced(sol));
     return { d: nx.total - cur.total, nx, revert(){ mv.undo(); ks.forEach((k, j) => { bags[k] = oldB[j]; terms[k] = oldT[j]; }); } };
   }
   // 初期温度：ふつうの悪化幅なら半分くらいの確率で受け入れる温度にする。最後はその 1/500 まで下げる
@@ -1170,31 +1220,41 @@ function createAnnealer(X, init, { iters, seed, W }){
 }
 
 // ---------- 画面に渡す形にする ----------
+// 戻り値の bags[i].C はその袋の大きさ。袋を指定したときは、空の袋も含めて指定した順に全部返す
+// units は袋に入った商品だけ（入れる順）。入りきらなかった商品は leftover
 function toPacked(X, bagStates, sol){
-  const { C, cell, colorOf, units, slack } = X;
-  const used = bagStates.filter(b => b.list.length);
-  const bags = used.map(b => ({
-    group: b.list.every(p => p.u.chem) ? "chem" : "food", kg: b.kg, top: b.top, n: b.list.length
+  const { colorOf } = X;
+  const shown = X.fixed ? bagStates.slice(0, X.fixed.length) : bagStates.filter(b => b.list.length);
+  const bags = shown.map(b => ({
+    C: b.C, slack: b.slack, kg: b.kg, top: b.top, n: b.list.length,
+    group: b.list.length && b.list.every(p => p.u.chem) ? "chem" : "food"
   }));
-  const recs = used.flatMap((b, bi) => b.list.map(p => ({ p, bi }))).sort((a, b) => a.p.u.i - b.p.u.i);
-  const labeled = new Set(), placed = [];
-  for(const { p, bi } of recs){
-    const { u, r } = p;
+  const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.p.u.i - b.p.u.i);
+  // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）
+  const stepOf = new Map(); let step = -1, prev = null;
+  for(const { p } of recs){ if(p.u.rank !== prev){ step++; prev = p.u.rank; } stepOf.set(p.u.i, step); }
+  const labeled = new Set(), placed = [], units = [];
+  for(const { p, b, bi } of recs){
+    const { u, r } = p, C = b.C;
+    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i) });
     // o: 置いた向き（orientations() の番号）。raw: その向きでの縮める前の寸法。3Dで向きと縮尺を合わせるのに使う
     // first: 同じ商品が複数あるとき、名前の札を1つだけ出すための目印
     const first = !labeled.has(u.it.id); labeled.add(u.it.id);
-    placed.push({ bag: bi, step: u.step, rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, kind: u.it.kind, name: u.it.name, first,
+    placed.push({ bag: bi, step: stepOf.get(u.i), rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, kind: u.it.kind, name: u.it.name, first,
       o: r.o, raw: r.raw, dims: [u.it.w, u.it.h, u.it.d],
-      w: r.a, d: r.b, h: r.h, x: r.ix * cell + r.a / 2 - C.W / 2, z: r.iz * cell + r.b / 2 - C.D / 2, y: r.base + r.h / 2 });
+      w: r.a, d: r.b, h: r.h, x: r.ix * b.cell + r.a / 2 - C.W / 2, z: r.iz * b.cell + r.b / 2 - C.D / 2, y: r.base + r.h / 2 });
   }
-  const total = score(bagStates.map(b => bagTerms(X, b)), PACKING.weights).total;
-  return { C, bags, placed, colorOf, units, slack, total, _state: { X, sol } };
+  const inBag = new Set(recs.map(x => x.p.u.i));
+  const leftover = X.units.filter(u => !inBag.has(u.i)).map(u => ({ it: u.it, rank: u.rank }));
+  const total = score(bagStates.map(bagTerms), weightsFor(X), countUnplaced(sol)).total;
+  return { C: X.C, fixed: !!X.fixed, bags, placed, colorOf, units, leftover, total, _state: { X, sol } };
 }
 
-// items: 商品の配列（レシートの上から順）、C: 袋・箱 { W, D, H, kg, kind }
-// 戻り値: { C, bags, placed, colorOf, units, slack, total }  units は入れる順番に並んでいる。すぐ返る（焼きなましはしない）
-function pack(items, C){
-  const X = makeContext(items, C);
+// items: 商品の配列（レシートの上から順）、C: おまかせのときの袋・箱 { W, D, H, kg, kind }
+// opt.bags: 袋を指定するときの袋・箱の配列（この数・この種類だけを使う）
+// 戻り値: { C, fixed, bags, placed, colorOf, units, leftover, total }。すぐ返る（焼きなましはしない）
+function pack(items, C, opt = {}){
+  const X = makeContext(items, C, opt.bags);
   const g = greedy(X);
   return toPacked(X, g.bags, g.sol);
 }
@@ -1207,7 +1267,7 @@ function improve(packed, onDone){
   let stopped = false, ann = null;
   const tick = () => {
     if(stopped) return;
-    if(!ann) ann = createAnnealer(S.X, S.sol, { iters: PACKING.iters, seed: seedFrom(S.X), W: PACKING.weights });
+    if(!ann) ann = createAnnealer(S.X, S.sol, { iters: PACKING.iters, seed: seedFrom(S.X), W: weightsFor(S.X) });
     const t0 = performance.now();
     while(!ann.done && performance.now() - t0 < 12) ann.step(4);
     if(!ann.done){ setTimeout(tick, 0); return; }
@@ -1683,13 +1743,16 @@ function show(packedResult, steps){
   if(!ready) return;
   disposeAll();
   const { C, bags, placed } = packed;
-  const n = Math.max(1, bags.length), gap = C.W * 0.35, span = n * C.W + (n - 1) * gap;
-  let topY = C.H;
-  for(let b = 0; b < n; b++){
-    const g = new THREE.Group(); g.position.x = -span / 2 + C.W / 2 + b * (C.W + gap); root.add(g);
-    topY = C.kind === "box" ? addBox(g, C) : addBag(g, C);
+  // 袋ごとに大きさが違ってよい（袋の数・種類を指定したとき）。左から順に、隙間をあけて並べる
+  const Cs = bags.length ? bags.map(b => b.C || C) : [C];
+  const maxW = Math.max(...Cs.map(c => c.W)), gap = maxW * 0.35;
+  const span = Cs.reduce((s, c) => s + c.W, 0) + (Cs.length - 1) * gap;
+  let topY = C.H, x = -span / 2;
+  for(const Cb of Cs){
+    const g = new THREE.Group(); g.position.x = x + Cb.W / 2; x += Cb.W + gap; root.add(g);
+    topY = Math.max(topY, Cb.kind === "box" ? addBox(g, Cb) : addBag(g, Cb));
   }
-  const labelH = Math.max(2.2, C.W * 0.085);
+  const labelH = Math.max(2.2, maxW * 0.085);
   placed.forEach(p => {
     const { holder, mats } = itemObject(p);
     root.children[p.bag].add(holder);
@@ -1814,15 +1877,28 @@ App.voice = { supported, speak, cancel, setEnabled, enabled: () => supported && 
 const { $, el, fmt, reduceMotion } = App.util;
 const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
-const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
+// fixed: 袋の数・種類を決めたときの袋・箱のidの並び（おまかせなら null）
+const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, fixed:null, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
 let aiReady = false, aiChecking = true, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
 // マイバッグ（bag-store.js に保存した袋・箱）を、袋詰めの計算で使う形にする
 const fromMyBag = b => ({ id:b.id, group:"マイバッグ", label:b.name, kind:b.kind, W:b.W, D:b.D, H:b.H, kg:b.kg });
 const myBags = () => App.bagStore.bags().map(fromMyBag);
+// id から袋・箱を探す（写真で測った大きさ・マイバッグ・レジ袋と段ボール）。見つからなければ null
+const findContainer = id => (id === "photo" ? state.photoContainer : null) || myBags().find(b => b.id === id) || PRESETS.find(p => p.id === id) || null;
 function container(){
-  const id = state.containerId;
-  if(id === "photo" && state.photoContainer) return state.photoContainer;
-  return myBags().find(b => b.id === id) || PRESETS.find(p => p.id === id) || PRESETS.find(p => p.id === DEFAULT_CONTAINER);
+  return findContainer(state.containerId) || PRESETS.find(p => p.id === DEFAULT_CONTAINER);
+}
+// 袋の数・種類を決めているときは、その袋・箱の一覧。おまかせなら null
+const MAX_FIXED = 8;
+const fixedBags = () => state.fixed ? state.fixed.map(findContainer).filter(Boolean) : null;
+function setFixed(list){
+  state.fixed = list && list.length ? list.slice(0, MAX_FIXED) : null;
+  renderContainerSeg(); renderPack();
+}
+// 「レジ袋 大×2・エコバッグ」のような短いまとめ
+function fixedSummary(F){
+  const m = new Map(); for(const C of F) m.set(nameOf(C), (m.get(nameOf(C)) || 0) + 1);
+  return [...m].map(([n, c]) => c > 1 ? `${n}×${c}` : n).join("・");
 }
 function selectContainer(id){
   state.containerId = id;
@@ -1837,8 +1913,9 @@ let armedDelete = "";   // 削除ボタンを1回押して「本当に消す？�
 function renderContainerSeg(){
   fillContainerHost($("containerSeg"), false);
   fillContainerHost($("introBagList"), true);
-  const C = container(), now = $("bpNow"); now.textContent = "";
-  now.append(el("b", null, nameOf(C)), el("span", null, `${Math.round(C.W)}×${Math.round(C.D)}×${Math.round(C.H)}cm・${C.kg}kgまで`));
+  const C = container(), F = fixedBags(), now = $("bpNow"); now.textContent = "";
+  if(F) now.append(el("b", null, `袋${F.length}つ`), el("span", null, fixedSummary(F)));
+  else now.append(el("b", null, nameOf(C)), el("span", null, `${Math.round(C.W)}×${Math.round(C.D)}×${Math.round(C.H)}cm・${C.kg}kgまで`));
 }
 function setIntroList(open){
   $("introBagList").hidden = !open;
@@ -1847,14 +1924,23 @@ function setIntroList(open){
 }
 
 // inIntro: 最初の画面の一覧なら、選んだら一覧を閉じる
+// 袋の数を決めているときは、下の袋・箱を押すたびに、その袋が1つ足される
 function fillContainerHost(host, inIntro){
   host.textContent = "";
+  const fixed = state.fixed;
   const dims = p => el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`);
   const choice = p => {
     const b = el("button", null, p.label); b.type = "button";
-    b.setAttribute("aria-pressed", String(p.id === state.containerId));
+    b.setAttribute("aria-pressed", String(!fixed && p.id === state.containerId));
     b.append(dims(p));
-    b.onclick = () => { selectContainer(p.id); if(inIntro) setIntroList(false); };
+    const count = fixed ? fixed.filter(id => id === p.id).length : 0;
+    if(count) b.append(el("span", "cnt", `×${count}`));
+    if(fixed) b.setAttribute("aria-label", `${p.label}を1つ足す（今${count}つ）`);
+    b.onclick = () => {
+      if(!fixed){ selectContainer(p.id); if(inIntro) setIntroList(false); return; }
+      if(fixed.length >= MAX_FIXED){ setStatus(`袋は${MAX_FIXED}つまでです`, true); return; }
+      setFixed([...fixed, p.id]);
+    };
     return b;
   };
   const group = (title, nodes) => {
@@ -1863,6 +1949,29 @@ function fillContainerHost(host, inIntro){
     seg.append(...nodes);
     g.append(el("span", "sub", title), seg); host.append(g);
   };
+
+  // 袋の数：おまかせ（全部入るまで同じ袋を使う）か、数と種類を決める
+  const mode = (label, on, act) => { const b = el("button", null, label); b.type = "button"; b.setAttribute("aria-pressed", String(on)); b.onclick = act; return b; };
+  group("袋の数", [
+    mode("おまかせ", !fixed, () => { if(fixed) setFixed(null); }),
+    mode("数と種類を決める", !!fixed, () => { if(!fixed) setFixed([container().id, container().id]); })
+  ]);
+  // 決めた袋の一覧。× で外す、＋ で最後の袋をもう1つ。入りきらない物は結果に「余り」として出る
+  if(fixed){
+    const slots = fixed.map((id, i) => {
+      const C = findContainer(id); if(!C) return null;
+      const wrap = el("span", "mybag");
+      const name = el("span", "slot", `${i + 1}. ${nameOf(C)}`); name.append(dims(C));
+      const del = el("button", "del", "×"); del.type = "button"; del.disabled = fixed.length <= 1;
+      del.setAttribute("aria-label", `${i + 1}つ目の${nameOf(C)}を外す`);
+      del.onclick = () => setFixed(fixed.filter((_, j) => j !== i));
+      wrap.append(name, del);
+      return wrap;
+    }).filter(Boolean);
+    const more = el("button", "add", "＋ もう1つ"); more.type = "button"; more.disabled = fixed.length >= MAX_FIXED;
+    more.onclick = () => setFixed([...fixed, fixed[fixed.length - 1]]);
+    group(`使う袋（${fixed.length}つ）　下の袋・箱を押すと1つ足せます`, [...slots, more]);
+  }
 
   // 写真から測った大きさ（＋そのまま保存するボタン）
   if(state.photoContainer){
@@ -1882,7 +1991,11 @@ function fillContainerHost(host, inIntro){
       armedDelete = "";
       try{ await App.bagStore.removeBag(p.id); setStatus(`「${p.label}」を削除しました`); }
       catch{ setStatus("削除できませんでした。通信状況を確認して、もう一度お試しください。", true); }
-      if(state.containerId === p.id) selectContainer(DEFAULT_CONTAINER); else renderContainerSeg();
+      if(state.fixed?.includes(p.id)){
+        const rest = state.fixed.filter(id => id !== p.id);
+        state.fixed = rest.length ? rest : [DEFAULT_CONTAINER];
+      }
+      if(state.containerId === p.id) selectContainer(DEFAULT_CONTAINER); else { renderContainerSeg(); renderPack(); }
     };
     wrap.append(choice(p), del);
     return wrap;
@@ -2094,7 +2207,8 @@ function stepSpeech(k){
 }
 function finishSpeech(){
   const P = lastPacked; if(!P) return "";
-  const unit = P.C.kind === "box" ? "箱" : "袋", n = P.bags.length;
+  const unit = P.C.kind === "box" ? "箱" : "袋", n = P.bags.length, left = P.leftover.length;
+  if(left) return `これで完了です。入りきらない物が${left}点あります。`;
   return n > 1 ? `これで完了です。${n}つの${unit}に分けました。` : `これで完了です。全部、1つの${unit}に入りました。`;
 }
 
@@ -2174,8 +2288,8 @@ function renderTable(){
 let stopImprove = () => {};
 function renderPack(){
   stopPlay(); stopImprove();
-  const C = container(), items = state.data.items.filter(it => it.qty > 0);
-  const packed = App.packing.pack(items, C);
+  const C = container(), F = fixedBags(), items = state.data.items.filter(it => it.qty > 0);
+  const packed = App.packing.pack(items, C, F ? { bags: F } : {});
   showPacked(packed, items, C, true);
   stopImprove = App.packing.improve(packed, better => {
     stopImprove = () => {};
@@ -2194,27 +2308,43 @@ function showPacked(packed, items, C, searching){
   $("store").textContent = d.store;
   $("summary").textContent = d.summary;
 
-  // 統計
-  const totalKg = packed.units.reduce((a, u) => a + u.it.kg, 0);
+  // 統計（袋の数・種類を決めたときは、袋ごとに大きさが違うことがある。b.C がその袋の大きさ）
+  const left = packed.leftover;
+  const totalKg = [...packed.units, ...left].reduce((a, u) => a + u.it.kg, 0);
   const maxBag = packed.bags.reduce((a, b) => Math.max(a, b.kg), 0);
-  const unit = C.kind === "box" ? "箱" : "袋";
+  const overAny = packed.bags.some(b => b.kg > b.C.kg + 1e-6);
+  const unit = packed.bags.every(b => b.C.kind === "box") && C.kind === "box" ? "箱" : "袋";
   const st = $("stats"); st.textContent = "";
   const stat = (k, v, u, bad) => { const s = el("div", "stat"); const vv = el("span", "v" + (bad ? " bad" : ""), v); if(u) vv.append(el("small", null, u)); s.append(vv, el("span", "k", k)); st.append(s); };
-  stat("商品", String(packed.units.length), "点");
+  stat("商品", String(packed.units.length + left.length), "点");
   stat("合計の重さ", fmt(totalKg), "kg");
-  stat(nameOf(C), String(packed.bags.length), unit);
-  stat("いちばん重い" + unit, fmt(maxBag), "kg", maxBag > C.kg);
+  stat(packed.fixed ? "使う袋" : nameOf(C), String(packed.bags.length), unit);
+  stat("いちばん重い" + unit, fmt(maxBag), "kg", overAny);
+  if(packed.fixed) stat("入りきらない", String(left.length), "点", left.length > 0);
 
   // 3Dの上に出す袋ごとの札
   const bt = $("bagtags"); bt.textContent = "";
   packed.bags.forEach((b, i) => {
-    const pct = Math.round(b.top / C.H * 100);
-    // 袋は持ち手を結ぶ分（packed.slack cm）までならはみ出してよい
-    const over = b.top > C.H + packed.slack + 0.5 || b.kg > C.kg;
-    bt.append(el("span", "bagtag" + (over ? " over" : ""), `${i + 1}${unit}目 ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
+    const pct = Math.round(b.top / b.C.H * 100);
+    // 袋は持ち手を結ぶ分（b.slack cm）までならはみ出してよい
+    const over = b.top > b.C.H + b.slack + 0.5 || b.kg > b.C.kg;
+    const name = packed.fixed ? `${i + 1}. ${nameOf(b.C)}` : `${i + 1}${unit}目`;
+    bt.append(el("span", "bagtag" + (over ? " over" : ""), `${name} ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
   });
-  if(C.kind === "bag") bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
-  if(searching){ const s = el("span", "bagtag note", "もっと良い詰め方を探しています…"); s.id = "searchTag"; bt.append(s); }
+  if(left.length) bt.append(el("span", "bagtag over", `入りきらない ${left.length}点`));
+  if(packed.bags.some(b => b.C.kind === "bag")) bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
+  if(searching){ const s = el("span", "bagtag note", packed.fixed ? "もっと入る詰め方を探しています…" : "もっと良い詰め方を探しています…"); s.id = "searchTag"; bt.append(s); }
+
+  // 入りきらなかった物（袋の数・種類を決めたとき）
+  $("leftSec").hidden = !left.length;
+  const ll = $("leftList"); ll.textContent = "";
+  const leftCount = new Map(); for(const u of left) leftCount.set(u.it, (leftCount.get(u.it) || 0) + 1);
+  for(const [it, n] of leftCount){
+    const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = packed.colorOf.get(it.id);
+    c.append(sw, it.name + (n > 1 ? " ×" + n : "")); ll.append(c);
+  }
+  const leftKg = left.reduce((a, u) => a + u.it.kg, 0);
+  $("leftNote").textContent = left.length ? `${left.length}点・${fmt(leftKg)}kg が入りません。袋を1つ足すか、大きい袋に変えてください。` : "";
 
   // 手順
   const ol = $("steps"); ol.textContent = "";
@@ -2238,7 +2368,8 @@ function showPacked(packed, items, C, searching){
   const warns = [...d.warnings];
   if(items.some(i => i.temp !== "room")) warns.push("冷凍・冷蔵品は同じ袋の中で隣どうしに入れると、冷たさが長持ちします。");
   if(items.some(i => i.separate === "raw")) warns.push("肉・魚は、サッカー台のポリ袋に入れてから詰めると汁がもれません。");
-  if(maxBag > C.kg) warns.push(`1つの${unit}が目安の${C.kg}kgを超えます。重い物を分けるか、大きい${unit}を選んでください。`);
+  if(overAny) warns.push(packed.fixed ? `耐荷重の目安を超える${unit}があります。重い物を分けるか、大きい${unit}を選んでください。`
+    : `1つの${unit}が目安の${C.kg}kgを超えます。重い物を分けるか、大きい${unit}を選んでください。`);
   $("warnSec").hidden = !warns.length;
   const wl = $("warnList"); wl.textContent = "";
   warns.forEach(w => wl.append(el("li", null, w)));

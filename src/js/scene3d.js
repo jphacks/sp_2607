@@ -187,13 +187,16 @@ function show(packedResult, steps){
   if(!ready) return;
   disposeAll();
   const { C, bags, placed } = packed;
-  const n = Math.max(1, bags.length), gap = C.W * 0.35, span = n * C.W + (n - 1) * gap;
-  let topY = C.H;
-  for(let b = 0; b < n; b++){
-    const g = new THREE.Group(); g.position.x = -span / 2 + C.W / 2 + b * (C.W + gap); root.add(g);
-    topY = C.kind === "box" ? addBox(g, C) : addBag(g, C);
+  // 袋ごとに大きさが違ってよい（袋の数・種類を指定したとき）。左から順に、隙間をあけて並べる
+  const Cs = bags.length ? bags.map(b => b.C || C) : [C];
+  const maxW = Math.max(...Cs.map(c => c.W)), gap = maxW * 0.35;
+  const span = Cs.reduce((s, c) => s + c.W, 0) + (Cs.length - 1) * gap;
+  let topY = C.H, x = -span / 2;
+  for(const Cb of Cs){
+    const g = new THREE.Group(); g.position.x = x + Cb.W / 2; x += Cb.W + gap; root.add(g);
+    topY = Math.max(topY, Cb.kind === "box" ? addBox(g, Cb) : addBag(g, Cb));
   }
-  const labelH = Math.max(2.2, C.W * 0.085);
+  const labelH = Math.max(2.2, maxW * 0.085);
   placed.forEach(p => {
     const { holder, mats } = itemObject(p);
     root.children[p.bag].add(holder);

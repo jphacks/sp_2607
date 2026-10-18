@@ -39,7 +39,8 @@ const STEP_TEXT = {
 const PACKING = {
   anneal: true, iters: 500, slackBag: 5, slackBox: 0, mixChem: true,
   weights: {
-    bags: 1000,      // 袋の数（個）
+    bags: 1000,      // 袋の数（個）。袋の数・種類を指定したときは数えない
+    left: 1000,      // 袋を指定したとき、入りきらずに余った商品（個）
     overflow: 60,    // はみ出してよい高さを超えた分（cm）
     overweight: 200, // 耐荷重を超えた重さ（kg）
     balance: 20,     // 食品の袋どうしの重さの差（kg）

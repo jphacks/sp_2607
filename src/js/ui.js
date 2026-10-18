@@ -4,15 +4,28 @@
 const { $, el, fmt, reduceMotion } = App.util;
 const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
-const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
+// fixed: 袋の数・種類を決めたときの袋・箱のidの並び（おまかせなら null）
+const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, fixed:null, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
 let aiReady = false, aiChecking = true, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
 // マイバッグ（bag-store.js に保存した袋・箱）を、袋詰めの計算で使う形にする
 const fromMyBag = b => ({ id:b.id, group:"マイバッグ", label:b.name, kind:b.kind, W:b.W, D:b.D, H:b.H, kg:b.kg });
 const myBags = () => App.bagStore.bags().map(fromMyBag);
+// id から袋・箱を探す（写真で測った大きさ・マイバッグ・レジ袋と段ボール）。見つからなければ null
+const findContainer = id => (id === "photo" ? state.photoContainer : null) || myBags().find(b => b.id === id) || PRESETS.find(p => p.id === id) || null;
 function container(){
-  const id = state.containerId;
-  if(id === "photo" && state.photoContainer) return state.photoContainer;
-  return myBags().find(b => b.id === id) || PRESETS.find(p => p.id === id) || PRESETS.find(p => p.id === DEFAULT_CONTAINER);
+  return findContainer(state.containerId) || PRESETS.find(p => p.id === DEFAULT_CONTAINER);
+}
+// 袋の数・種類を決めているときは、その袋・箱の一覧。おまかせなら null
+const MAX_FIXED = 8;
+const fixedBags = () => state.fixed ? state.fixed.map(findContainer).filter(Boolean) : null;
+function setFixed(list){
+  state.fixed = list && list.length ? list.slice(0, MAX_FIXED) : null;
+  renderContainerSeg(); renderPack();
+}
+// 「レジ袋 大×2・エコバッグ」のような短いまとめ
+function fixedSummary(F){
+  const m = new Map(); for(const C of F) m.set(nameOf(C), (m.get(nameOf(C)) || 0) + 1);
+  return [...m].map(([n, c]) => c > 1 ? `${n}×${c}` : n).join("・");
 }
 function selectContainer(id){
   state.containerId = id;
@@ -27,8 +40,9 @@ let armedDelete = "";   // 削除ボタンを1回押して「本当に消す？�
 function renderContainerSeg(){
   fillContainerHost($("containerSeg"), false);
   fillContainerHost($("introBagList"), true);
-  const C = container(), now = $("bpNow"); now.textContent = "";
-  now.append(el("b", null, nameOf(C)), el("span", null, `${Math.round(C.W)}×${Math.round(C.D)}×${Math.round(C.H)}cm・${C.kg}kgまで`));
+  const C = container(), F = fixedBags(), now = $("bpNow"); now.textContent = "";
+  if(F) now.append(el("b", null, `袋${F.length}つ`), el("span", null, fixedSummary(F)));
+  else now.append(el("b", null, nameOf(C)), el("span", null, `${Math.round(C.W)}×${Math.round(C.D)}×${Math.round(C.H)}cm・${C.kg}kgまで`));
 }
 function setIntroList(open){
   $("introBagList").hidden = !open;
@@ -37,14 +51,23 @@ function setIntroList(open){
 }
 
 // inIntro: 最初の画面の一覧なら、選んだら一覧を閉じる
+// 袋の数を決めているときは、下の袋・箱を押すたびに、その袋が1つ足される
 function fillContainerHost(host, inIntro){
   host.textContent = "";
+  const fixed = state.fixed;
   const dims = p => el("small", null, `${Math.round(p.W)}×${Math.round(p.D)}×${Math.round(p.H)}`);
   const choice = p => {
     const b = el("button", null, p.label); b.type = "button";
-    b.setAttribute("aria-pressed", String(p.id === state.containerId));
+    b.setAttribute("aria-pressed", String(!fixed && p.id === state.containerId));
     b.append(dims(p));
-    b.onclick = () => { selectContainer(p.id); if(inIntro) setIntroList(false); };
+    const count = fixed ? fixed.filter(id => id === p.id).length : 0;
+    if(count) b.append(el("span", "cnt", `×${count}`));
+    if(fixed) b.setAttribute("aria-label", `${p.label}を1つ足す（今${count}つ）`);
+    b.onclick = () => {
+      if(!fixed){ selectContainer(p.id); if(inIntro) setIntroList(false); return; }
+      if(fixed.length >= MAX_FIXED){ setStatus(`袋は${MAX_FIXED}つまでです`, true); return; }
+      setFixed([...fixed, p.id]);
+    };
     return b;
   };
   const group = (title, nodes) => {
@@ -53,6 +76,29 @@ function fillContainerHost(host, inIntro){
     seg.append(...nodes);
     g.append(el("span", "sub", title), seg); host.append(g);
   };
+
+  // 袋の数：おまかせ（全部入るまで同じ袋を使う）か、数と種類を決める
+  const mode = (label, on, act) => { const b = el("button", null, label); b.type = "button"; b.setAttribute("aria-pressed", String(on)); b.onclick = act; return b; };
+  group("袋の数", [
+    mode("おまかせ", !fixed, () => { if(fixed) setFixed(null); }),
+    mode("数と種類を決める", !!fixed, () => { if(!fixed) setFixed([container().id, container().id]); })
+  ]);
+  // 決めた袋の一覧。× で外す、＋ で最後の袋をもう1つ。入りきらない物は結果に「余り」として出る
+  if(fixed){
+    const slots = fixed.map((id, i) => {
+      const C = findContainer(id); if(!C) return null;
+      const wrap = el("span", "mybag");
+      const name = el("span", "slot", `${i + 1}. ${nameOf(C)}`); name.append(dims(C));
+      const del = el("button", "del", "×"); del.type = "button"; del.disabled = fixed.length <= 1;
+      del.setAttribute("aria-label", `${i + 1}つ目の${nameOf(C)}を外す`);
+      del.onclick = () => setFixed(fixed.filter((_, j) => j !== i));
+      wrap.append(name, del);
+      return wrap;
+    }).filter(Boolean);
+    const more = el("button", "add", "＋ もう1つ"); more.type = "button"; more.disabled = fixed.length >= MAX_FIXED;
+    more.onclick = () => setFixed([...fixed, fixed[fixed.length - 1]]);
+    group(`使う袋（${fixed.length}つ）　下の袋・箱を押すと1つ足せます`, [...slots, more]);
+  }
 
   // 写真から測った大きさ（＋そのまま保存するボタン）
   if(state.photoContainer){
@@ -72,7 +118,11 @@ function fillContainerHost(host, inIntro){
       armedDelete = "";
       try{ await App.bagStore.removeBag(p.id); setStatus(`「${p.label}」を削除しました`); }
       catch{ setStatus("削除できませんでした。通信状況を確認して、もう一度お試しください。", true); }
-      if(state.containerId === p.id) selectContainer(DEFAULT_CONTAINER); else renderContainerSeg();
+      if(state.fixed?.includes(p.id)){
+        const rest = state.fixed.filter(id => id !== p.id);
+        state.fixed = rest.length ? rest : [DEFAULT_CONTAINER];
+      }
+      if(state.containerId === p.id) selectContainer(DEFAULT_CONTAINER); else { renderContainerSeg(); renderPack(); }
     };
     wrap.append(choice(p), del);
     return wrap;
@@ -284,7 +334,8 @@ function stepSpeech(k){
 }
 function finishSpeech(){
   const P = lastPacked; if(!P) return "";
-  const unit = P.C.kind === "box" ? "箱" : "袋", n = P.bags.length;
+  const unit = P.C.kind === "box" ? "箱" : "袋", n = P.bags.length, left = P.leftover.length;
+  if(left) return `これで完了です。入りきらない物が${left}点あります。`;
   return n > 1 ? `これで完了です。${n}つの${unit}に分けました。` : `これで完了です。全部、1つの${unit}に入りました。`;
 }
 
@@ -364,8 +415,8 @@ function renderTable(){
 let stopImprove = () => {};
 function renderPack(){
   stopPlay(); stopImprove();
-  const C = container(), items = state.data.items.filter(it => it.qty > 0);
-  const packed = App.packing.pack(items, C);
+  const C = container(), F = fixedBags(), items = state.data.items.filter(it => it.qty > 0);
+  const packed = App.packing.pack(items, C, F ? { bags: F } : {});
   showPacked(packed, items, C, true);
   stopImprove = App.packing.improve(packed, better => {
     stopImprove = () => {};
@@ -384,27 +435,43 @@ function showPacked(packed, items, C, searching){
   $("store").textContent = d.store;
   $("summary").textContent = d.summary;
 
-  // 統計
-  const totalKg = packed.units.reduce((a, u) => a + u.it.kg, 0);
+  // 統計（袋の数・種類を決めたときは、袋ごとに大きさが違うことがある。b.C がその袋の大きさ）
+  const left = packed.leftover;
+  const totalKg = [...packed.units, ...left].reduce((a, u) => a + u.it.kg, 0);
   const maxBag = packed.bags.reduce((a, b) => Math.max(a, b.kg), 0);
-  const unit = C.kind === "box" ? "箱" : "袋";
+  const overAny = packed.bags.some(b => b.kg > b.C.kg + 1e-6);
+  const unit = packed.bags.every(b => b.C.kind === "box") && C.kind === "box" ? "箱" : "袋";
   const st = $("stats"); st.textContent = "";
   const stat = (k, v, u, bad) => { const s = el("div", "stat"); const vv = el("span", "v" + (bad ? " bad" : ""), v); if(u) vv.append(el("small", null, u)); s.append(vv, el("span", "k", k)); st.append(s); };
-  stat("商品", String(packed.units.length), "点");
+  stat("商品", String(packed.units.length + left.length), "点");
   stat("合計の重さ", fmt(totalKg), "kg");
-  stat(nameOf(C), String(packed.bags.length), unit);
-  stat("いちばん重い" + unit, fmt(maxBag), "kg", maxBag > C.kg);
+  stat(packed.fixed ? "使う袋" : nameOf(C), String(packed.bags.length), unit);
+  stat("いちばん重い" + unit, fmt(maxBag), "kg", overAny);
+  if(packed.fixed) stat("入りきらない", String(left.length), "点", left.length > 0);
 
   // 3Dの上に出す袋ごとの札
   const bt = $("bagtags"); bt.textContent = "";
   packed.bags.forEach((b, i) => {
-    const pct = Math.round(b.top / C.H * 100);
-    // 袋は持ち手を結ぶ分（packed.slack cm）までならはみ出してよい
-    const over = b.top > C.H + packed.slack + 0.5 || b.kg > C.kg;
-    bt.append(el("span", "bagtag" + (over ? " over" : ""), `${i + 1}${unit}目 ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
+    const pct = Math.round(b.top / b.C.H * 100);
+    // 袋は持ち手を結ぶ分（b.slack cm）までならはみ出してよい
+    const over = b.top > b.C.H + b.slack + 0.5 || b.kg > b.C.kg;
+    const name = packed.fixed ? `${i + 1}. ${nameOf(b.C)}` : `${i + 1}${unit}目`;
+    bt.append(el("span", "bagtag" + (over ? " over" : ""), `${name} ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
   });
-  if(C.kind === "bag") bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
-  if(searching){ const s = el("span", "bagtag note", "もっと良い詰め方を探しています…"); s.id = "searchTag"; bt.append(s); }
+  if(left.length) bt.append(el("span", "bagtag over", `入りきらない ${left.length}点`));
+  if(packed.bags.some(b => b.C.kind === "bag")) bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
+  if(searching){ const s = el("span", "bagtag note", packed.fixed ? "もっと入る詰め方を探しています…" : "もっと良い詰め方を探しています…"); s.id = "searchTag"; bt.append(s); }
+
+  // 入りきらなかった物（袋の数・種類を決めたとき）
+  $("leftSec").hidden = !left.length;
+  const ll = $("leftList"); ll.textContent = "";
+  const leftCount = new Map(); for(const u of left) leftCount.set(u.it, (leftCount.get(u.it) || 0) + 1);
+  for(const [it, n] of leftCount){
+    const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = packed.colorOf.get(it.id);
+    c.append(sw, it.name + (n > 1 ? " ×" + n : "")); ll.append(c);
+  }
+  const leftKg = left.reduce((a, u) => a + u.it.kg, 0);
+  $("leftNote").textContent = left.length ? `${left.length}点・${fmt(leftKg)}kg が入りません。袋を1つ足すか、大きい袋に変えてください。` : "";
 
   // 手順
   const ol = $("steps"); ol.textContent = "";
@@ -428,7 +495,8 @@ function showPacked(packed, items, C, searching){
   const warns = [...d.warnings];
   if(items.some(i => i.temp !== "room")) warns.push("冷凍・冷蔵品は同じ袋の中で隣どうしに入れると、冷たさが長持ちします。");
   if(items.some(i => i.separate === "raw")) warns.push("肉・魚は、サッカー台のポリ袋に入れてから詰めると汁がもれません。");
-  if(maxBag > C.kg) warns.push(`1つの${unit}が目安の${C.kg}kgを超えます。重い物を分けるか、大きい${unit}を選んでください。`);
+  if(overAny) warns.push(packed.fixed ? `耐荷重の目安を超える${unit}があります。重い物を分けるか、大きい${unit}を選んでください。`
+    : `1つの${unit}が目安の${C.kg}kgを超えます。重い物を分けるか、大きい${unit}を選んでください。`);
   $("warnSec").hidden = !warns.length;
   const wl = $("warnList"); wl.textContent = "";
   warns.forEach(w => wl.append(el("li", null, w)));

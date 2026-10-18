@@ -4,10 +4,12 @@
 //    「上面の高さ ＋ 足元の隙間 − 壁や隣との接触」が一番小さい位置に置いていく（pack）
 // 3. 磨く：評価関数（袋の数・重さの偏り・重い物の高さ…）が小さくなるよう、商品を別の袋に移す・向きを変える、を
 //    焼きなまし法で何百回も試す（improve）。入れる順番は 1 のまま変えない
+// 袋の使い方は2通り：
+//   おまかせ … 同じ袋・箱を、全部入るまで必要なだけ使う
+//   袋を指定 … 決めた数・種類の袋だけを使う。入りきらない物は「余り」として返す（余りが少ないほど良い）
 (function(App){
 "use strict";
 const { PALETTE, STEP_TEXT, KINDS, PACKING } = App.config;
-
 // 一覧の色見本と3Dの色をそろえる。種類が分かればその種類の色
 const colorFor = (it, i) => KINDS[it.kind]?.color || PALETTE[i % PALETTE.length];
 
@@ -83,12 +85,10 @@ function orderUnits(units){
   return out;
 }
 
+
 // ---------- 置く場所 ----------
-// 計算に使う道具一式：袋の寸法、格子、商品（入れる順）、はみ出してよい高さ
-function makeContext(items, C){
-  const { W, D } = C;
-  const cell = Math.max(W, D) < 40 ? 1.5 : 2;
-  const nx = Math.max(1, Math.floor(W / cell)), nz = Math.max(1, Math.floor(D / cell));
+// 計算に使う道具一式：商品（入れる順）、おまかせのときの袋 C、指定した袋の一覧 fixed（おまかせなら null）
+function makeContext(items, C, fixed){
   const colorOf = new Map(items.map((it, i) => [it.id, colorFor(it, i)]));
   const raw = [];
   // group: 入れる順番のルールを比べる相手。日用品を食品と同じ袋に入れてよいなら、日用品も食品と比べて最後に回す
@@ -100,15 +100,20 @@ function makeContext(items, C){
   });
   const units = orderUnits(raw);
   units.forEach((u, i) => u.i = i);
-  // 袋は持ち手を結べるので、口から少しならはみ出してよい。箱はフタが閉まらなくなるので許さない
-  const slack = C.kind === "box" ? PACKING.slackBox : PACKING.slackBag;
-  return { C, cell, nx, nz, units, colorOf, slack };
+  return { C, units, colorOf, fixed: fixed && fixed.length ? fixed : null };
 }
 
-// 袋ごとに2枚の地図を持つ：hm＝各マスの今の高さ、lim＝各マスの一番上に、あと何kgまで載せてよいか
-const newBag = (X, group) => ({ group, hm: new Float32Array(X.nx * X.nz), lim: new Float32Array(X.nx * X.nz).fill(Infinity), kg: 0, top: 0, list: [] });
-// 日用品を食品と同じ袋に入れてよいなら、袋の区別はしない
-const bagGroupOf = u => PACKING.mixChem ? "all" : u.group;
+// 袋1つ。袋ごとに大きさが違ってよいので、格子も袋ごとに持つ
+// 2枚の地図：hm＝各マスの今の高さ、lim＝各マスの一番上に、あと何kgまで載せてよいか
+// slack: 口から何cmまではみ出してよいか（袋は持ち手を結べるので少しならよい。箱はフタが閉まらなくなるので許さない）
+function newBag(group, C){
+  const cell = Math.max(C.W, C.D) < 40 ? 1.5 : 2;
+  const nx = Math.max(1, Math.floor(C.W / cell)), nz = Math.max(1, Math.floor(C.D / cell));
+  return { group, C, cell, nx, nz, slack: C.kind === "box" ? PACKING.slackBox : PACKING.slackBag,
+    hm: new Float32Array(nx * nz), lim: new Float32Array(nx * nz).fill(Infinity), kg: 0, top: 0, list: [], spill: [] };
+}
+// 日用品を食品と同じ袋に入れてよいなら、袋の区別はしない（袋を指定したときも区別しない）
+const bagGroupOf = (X, u) => PACKING.mixChem || X.fixed ? "all" : u.group;
 
 // 幅 ca × 奥行 cb の窓の中の最大（または最小）を、全部の位置について求める（行→列の2段で計算を減らす）
 function windowReduce(a, nx, nz, ca, cb, useMax){
@@ -150,8 +155,8 @@ function contact(hm, nx, nz, ix, iz, ca, cb, base, h){
 //   ignoreLim: false なら、下の物が耐えられない場所には置かない（置き場所が無ければ null）
 //              true なら、耐えられない重さが一番小さい場所を選ぶ（ほかに置き場所がないときの逃げ道）
 const GAP_W = 1.2, CONTACT_MAX = 4;
-function find(X, bag, u, rot, ignoreLim){
-  const { C, cell, nx, nz } = X, { hm, lim } = bag, kg = u.it.kg;
+function find(bag, u, rot, ignoreLim){
+  const { C, cell, nx, nz, hm, lim } = bag, kg = u.it.kg;
   const ors = orientations(u.it), list = rot >= 0 && rot < ors.length ? [rot] : ors.map((_, o) => o);
   const ps = prefix(hm, nx, nz);
   let r = null;
@@ -175,8 +180,11 @@ function find(X, bag, u, rot, ignoreLim){
   return r;
 }
 
-function commit(X, bag, u, r){
-  const { cell, nx } = X, top = r.base + r.h, n = r.ca * r.cb;
+// その置き方で袋に収まるか（口からのはみ出しが許す高さ以内、重さが耐荷重以内）
+const fits = (bag, u, r) => !!r && r.base + r.h <= bag.C.H + bag.slack + 0.5 && bag.kg + u.it.kg <= bag.C.kg + 1e-6;
+
+function commit(bag, u, r){
+  const { cell, nx } = bag, top = r.base + r.h, n = r.ca * r.cb;
   // 置いた物の上に載せてよい重さ＝「この商品自身の上限」と「下の物の残りの上限から、この商品の重さを引いた分」の小さい方
   const nextLim = Math.min(u.lim, r.minLim - u.it.kg);
   let dead = 0, sup = 0;
@@ -190,29 +198,41 @@ function commit(X, bag, u, r){
   bag.list.push({ u, r, x0, x1: x0 + r.a, z0, z1: z0 + r.b, y0: r.base, y1: top,
     dead: dead * cell * cell, support: r.base < 0.5 ? 1 : sup / n, over: Math.max(0, u.it.kg - r.minLim) });
 }
-const placeIn = (X, bag, u, rot) => commit(X, bag, u, find(X, bag, u, rot, false) || find(X, bag, u, rot, true));
+// 袋に入れる。strict（袋を指定したとき）なら、収まらない物は入れずに spill（余り）へ回す
+function placeIn(bag, u, rot, strict){
+  const r = find(bag, u, rot, false) || find(bag, u, rot, true);
+  if(strict && !fits(bag, u, r)){ bag.spill.push(u); return false; }
+  commit(bag, u, r); return true;
+}
 
-// 最初の詰め方：入れる順に、入る袋のうち最初の袋へ（first-fit）。入らなければ袋を増やす
+// 最初の詰め方：入れる順に、入る袋のうち最初の袋へ（first-fit）
+//   おまかせ … 入らなければ袋を増やす
+//   袋を指定 … どの袋にも入らなければ余り（袋の番号 -1）
 function greedy(X){
-  const { C, units, slack } = X;
-  const bag = new Array(units.length), bagGroup = [], states = [];
+  const { units } = X;
+  const bag = new Array(units.length).fill(-1), bagGroup = [], Cs = [], states = [];
+  if(X.fixed) for(const C of X.fixed){ states.push(newBag("all", C)); bagGroup.push("all"); Cs.push(C); }
   for(const u of units){
     let k = -1, r = null;
     for(let j = 0; j < states.length; j++){
-      if(bagGroup[j] !== bagGroupOf(u) || states[j].kg + u.it.kg > C.kg) continue;
-      const q = find(X, states[j], u, -1, false);
-      if(q && q.base + q.h <= C.H + slack + 0.5){ k = j; r = q; break; }
+      if(bagGroup[j] !== bagGroupOf(X, u)) continue;
+      const q = find(states[j], u, -1, false);
+      if(fits(states[j], u, q)){ k = j; r = q; break; }
     }
-    if(k < 0){ k = states.length; states.push(newBag(X, bagGroupOf(u))); bagGroup.push(bagGroupOf(u)); r = find(X, states[k], u, -1, false) || find(X, states[k], u, -1, true); }
-    commit(X, states[k], u, r); bag[u.i] = k;
+    if(k < 0){
+      if(X.fixed) continue;
+      k = states.length; states.push(newBag(bagGroupOf(X, u), X.C)); bagGroup.push(bagGroupOf(X, u)); Cs.push(X.C);
+      r = find(states[k], u, -1, false) || find(states[k], u, -1, true);
+    }
+    commit(states[k], u, r); bag[u.i] = k;
   }
-  return { sol: { bag, rot: new Array(units.length).fill(-1), bagGroup }, bags: states };
+  return { sol: { bag, rot: new Array(units.length).fill(-1), bagGroup, Cs }, bags: states };
 }
 
 // 解（どの商品をどの袋に・どの向きで）から袋を組み立てる。袋どうしは独立なので1袋ずつ作れる
 function buildBag(X, sol, k){
-  const b = newBag(X, sol.bagGroup[k]);
-  for(const u of X.units) if(sol.bag[u.i] === k) placeIn(X, b, u, sol.rot[u.i]);
+  const b = newBag(sol.bagGroup[k], sol.Cs[k]);
+  for(const u of X.units) if(sol.bag[u.i] === k) placeIn(b, u, sol.rot[u.i], !!X.fixed);
   return b;
 }
 
@@ -220,10 +240,10 @@ function buildBag(X, sol, k){
 const overlap = (p, q) => p.x0 < q.x1 - 0.3 && q.x0 < p.x1 - 0.3 && p.z0 < q.z1 - 0.3 && q.z0 < p.z1 - 0.3;
 
 // 袋1つ分の項目
-function bagTerms(X, bag){
-  const { C, slack } = X, H = C.H, ps = bag.list;
+function bagTerms(bag){
+  const { C, slack } = bag, H = C.H, ps = bag.list;
   const nChem = ps.filter(p => p.u.chem).length;
-  const t = { n: ps.length, food: ps.length - nChem, kg: bag.kg, cold: false,
+  const t = { n: ps.length, food: ps.length - nChem, kg: bag.kg, cap: C.kg, cold: false, spill: bag.spill.length,
     overflow: Math.max(0, bag.top - H - slack), overweight: Math.max(0, bag.kg - C.kg),
     cog: 0, dead: 0, support: 0, crush: 0, raw: 0, mix: ps.length > nChem ? nChem : 0 };
   for(const p of ps){
@@ -238,18 +258,24 @@ function bagTerms(X, bag){
 }
 
 // 全体の点数。q は各項目の量、total は 量 × 重み（config.js の PACKING.weights）の合計
-function score(terms, W){
+//   unplaced: どの袋にも割り当てていない商品の数（袋を指定したときの余り）
+//   袋どうしの重さの差は「耐荷重に対する割合」の差 × 平均の耐荷重。同じ袋ばかりなら、ただの重さの差と同じ
+function score(terms, W, unplaced = 0){
   const used = terms.filter(t => t.n > 0), food = used.filter(t => t.food > 0);
-  const sum = k => used.reduce((s, t) => s + t[k], 0);
+  const sum = k => terms.reduce((s, t) => s + t[k], 0);
+  const ratio = food.map(t => t.kg / t.cap), capAvg = food.reduce((s, t) => s + t.cap, 0) / Math.max(1, food.length);
   const q = {
-    bags: used.length, overflow: sum("overflow"), overweight: sum("overweight"),
-    balance: food.length > 1 ? Math.max(...food.map(t => t.kg)) - Math.min(...food.map(t => t.kg)) : 0,
+    bags: used.length, left: unplaced + sum("spill"), overflow: sum("overflow"), overweight: sum("overweight"),
+    balance: food.length > 1 ? (Math.max(...ratio) - Math.min(...ratio)) * capAvg : 0,
     cog: sum("cog"), dead: sum("dead"), support: sum("support"), crush: sum("crush"),
     cold: Math.max(0, used.filter(t => t.cold).length - 1), raw: sum("raw"), mix: sum("mix")
   };
   let total = 0; for(const k in q) total += q[k] * (W[k] || 0);
   return { total, q };
 }
+// 袋を指定したときは、袋の数は決まっているので数えない
+const weightsFor = X => X.fixed ? { ...PACKING.weights, bags: 0 } : PACKING.weights;
+const countUnplaced = sol => sol.bag.reduce((s, b) => s + (b < 0), 0);
 
 // ---------- 焼きなまし ----------
 function mulberry32(a){
@@ -259,30 +285,34 @@ function mulberry32(a){
 // 乱数の種は商品と袋から作る。同じレシート・同じ袋なら毎回同じ詰め方になる
 function seedFrom(X){
   let h = 2166136261;
-  const s = JSON.stringify([X.units.map(u => [u.it.name, u.it.w, u.it.d, u.it.h, u.it.kg]), X.C.W, X.C.D, X.C.H, X.C.kg]);
+  const bags = (X.fixed || [X.C]).map(C => [C.W, C.D, C.H, C.kg]);
+  const s = JSON.stringify([X.units.map(u => [u.it.name, u.it.w, u.it.d, u.it.h, u.it.kg]), bags]);
   for(let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0;
 }
-const cloneSol = s => ({ bag: s.bag.slice(), rot: s.rot.slice(), bagGroup: s.bagGroup.slice() });
+const cloneSol = s => ({ bag: s.bag.slice(), rot: s.rot.slice(), bagGroup: s.bagGroup.slice(), Cs: s.Cs.slice() });
 
 function createAnnealer(X, init, { iters, seed, W }){
   const rnd = mulberry32(seed), U = X.units, n = U.length;
   const sol = cloneSol(init);
-  for(const g of new Set(sol.bagGroup)) sol.bagGroup.push(g); // 新しい袋を開けられるよう、空の袋を1つずつ足す
-  const bags = sol.bagGroup.map((_, k) => buildBag(X, sol, k)), terms = bags.map(b => bagTerms(X, b));
-  let cur = score(terms, W);
+  // おまかせのときは、新しい袋を開けられるよう、空の袋を1つずつ足しておく
+  if(!X.fixed) for(const g of new Set(sol.bagGroup)){ sol.bagGroup.push(g); sol.Cs.push(X.C); }
+  const bags = sol.bagGroup.map((_, k) => buildBag(X, sol, k)), terms = bags.map(bagTerms);
+  let cur = score(terms, W, countUnplaced(sol));
   const start = cur.total;
   let best = { ...cur, sol: cloneSol(sol), bags: bags.slice() };
   const pick = a => a[Math.floor(rnd() * a.length)];
+  const groupOfBag = k => k < 0 ? null : sol.bagGroup[k];
 
-  // 近くの解を1つ作る。戻り値: 触った袋と、元に戻す関数
+  // 近くの解を1つ作る。戻り値: 触った袋と、元に戻す関数。袋の番号 -1 は余り（袋を指定したときだけ使う）
   function propose(){
-    const r = rnd(), i = Math.floor(rnd() * n), g = bagGroupOf(U[i]);
-    if(r < 0.45){ // 別の袋に移す
+    const r = rnd(), i = Math.floor(rnd() * n), g = bagGroupOf(X, U[i]);
+    if(r < 0.45){ // 別の袋（または余り）に移す
       const c = []; sol.bagGroup.forEach((bg, k) => { if(bg === g && k !== sol.bag[i]) c.push(k); });
+      if(X.fixed && sol.bag[i] >= 0) c.push(-1);
       if(c.length){ const from = sol.bag[i], to = pick(c); sol.bag[i] = to; return { touched: [from, to], undo: () => { sol.bag[i] = from; } }; }
-    } else if(r < 0.75){ // 違う袋の2個を入れ替える
-      const c = []; for(let j = 0; j < n; j++) if(bagGroupOf(U[j]) === g && sol.bag[j] !== sol.bag[i]) c.push(j);
+    } else if(r < 0.75){ // 違う袋（または余り）の2個を入れ替える
+      const c = []; for(let j = 0; j < n; j++) if(bagGroupOf(X, U[j]) === g && sol.bag[j] !== sol.bag[i]) c.push(j);
       if(c.length){ const j = pick(c), a = sol.bag[i], b = sol.bag[j]; sol.bag[i] = b; sol.bag[j] = a;
         return { touched: [a, b], undo: () => { sol.bag[i] = a; sol.bag[j] = b; } }; }
     }
@@ -293,10 +323,10 @@ function createAnnealer(X, init, { iters, seed, W }){
   }
   // 動かして、触った袋だけ作り直して採点する
   function trial(){
-    const mv = propose(), ks = [...new Set(mv.touched)];
+    const mv = propose(), ks = [...new Set(mv.touched)].filter(k => k >= 0);
     const oldB = ks.map(k => bags[k]), oldT = ks.map(k => terms[k]);
-    for(const k of ks){ bags[k] = buildBag(X, sol, k); terms[k] = bagTerms(X, bags[k]); }
-    const nx = score(terms, W);
+    for(const k of ks){ bags[k] = buildBag(X, sol, k); terms[k] = bagTerms(bags[k]); }
+    const nx = score(terms, W, countUnplaced(sol));
     return { d: nx.total - cur.total, nx, revert(){ mv.undo(); ks.forEach((k, j) => { bags[k] = oldB[j]; terms[k] = oldT[j]; }); } };
   }
   // 初期温度：ふつうの悪化幅なら半分くらいの確率で受け入れる温度にする。最後はその 1/500 まで下げる
@@ -318,31 +348,41 @@ function createAnnealer(X, init, { iters, seed, W }){
 }
 
 // ---------- 画面に渡す形にする ----------
+// 戻り値の bags[i].C はその袋の大きさ。袋を指定したときは、空の袋も含めて指定した順に全部返す
+// units は袋に入った商品だけ（入れる順）。入りきらなかった商品は leftover
 function toPacked(X, bagStates, sol){
-  const { C, cell, colorOf, units, slack } = X;
-  const used = bagStates.filter(b => b.list.length);
-  const bags = used.map(b => ({
-    group: b.list.every(p => p.u.chem) ? "chem" : "food", kg: b.kg, top: b.top, n: b.list.length
+  const { colorOf } = X;
+  const shown = X.fixed ? bagStates.slice(0, X.fixed.length) : bagStates.filter(b => b.list.length);
+  const bags = shown.map(b => ({
+    C: b.C, slack: b.slack, kg: b.kg, top: b.top, n: b.list.length,
+    group: b.list.length && b.list.every(p => p.u.chem) ? "chem" : "food"
   }));
-  const recs = used.flatMap((b, bi) => b.list.map(p => ({ p, bi }))).sort((a, b) => a.p.u.i - b.p.u.i);
-  const labeled = new Set(), placed = [];
-  for(const { p, bi } of recs){
-    const { u, r } = p;
+  const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.p.u.i - b.p.u.i);
+  // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）
+  const stepOf = new Map(); let step = -1, prev = null;
+  for(const { p } of recs){ if(p.u.rank !== prev){ step++; prev = p.u.rank; } stepOf.set(p.u.i, step); }
+  const labeled = new Set(), placed = [], units = [];
+  for(const { p, b, bi } of recs){
+    const { u, r } = p, C = b.C;
+    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i) });
     // o: 置いた向き（orientations() の番号）。raw: その向きでの縮める前の寸法。3Dで向きと縮尺を合わせるのに使う
     // first: 同じ商品が複数あるとき、名前の札を1つだけ出すための目印
     const first = !labeled.has(u.it.id); labeled.add(u.it.id);
-    placed.push({ bag: bi, step: u.step, rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, kind: u.it.kind, name: u.it.name, first,
+    placed.push({ bag: bi, step: stepOf.get(u.i), rank: u.rank, color: colorOf.get(u.it.id), shape: u.it.shape, kind: u.it.kind, name: u.it.name, first,
       o: r.o, raw: r.raw, dims: [u.it.w, u.it.h, u.it.d],
-      w: r.a, d: r.b, h: r.h, x: r.ix * cell + r.a / 2 - C.W / 2, z: r.iz * cell + r.b / 2 - C.D / 2, y: r.base + r.h / 2 });
+      w: r.a, d: r.b, h: r.h, x: r.ix * b.cell + r.a / 2 - C.W / 2, z: r.iz * b.cell + r.b / 2 - C.D / 2, y: r.base + r.h / 2 });
   }
-  const total = score(bagStates.map(b => bagTerms(X, b)), PACKING.weights).total;
-  return { C, bags, placed, colorOf, units, slack, total, _state: { X, sol } };
+  const inBag = new Set(recs.map(x => x.p.u.i));
+  const leftover = X.units.filter(u => !inBag.has(u.i)).map(u => ({ it: u.it, rank: u.rank }));
+  const total = score(bagStates.map(bagTerms), weightsFor(X), countUnplaced(sol)).total;
+  return { C: X.C, fixed: !!X.fixed, bags, placed, colorOf, units, leftover, total, _state: { X, sol } };
 }
 
-// items: 商品の配列（レシートの上から順）、C: 袋・箱 { W, D, H, kg, kind }
-// 戻り値: { C, bags, placed, colorOf, units, slack, total }  units は入れる順番に並んでいる。すぐ返る（焼きなましはしない）
-function pack(items, C){
-  const X = makeContext(items, C);
+// items: 商品の配列（レシートの上から順）、C: おまかせのときの袋・箱 { W, D, H, kg, kind }
+// opt.bags: 袋を指定するときの袋・箱の配列（この数・この種類だけを使う）
+// 戻り値: { C, fixed, bags, placed, colorOf, units, leftover, total }。すぐ返る（焼きなましはしない）
+function pack(items, C, opt = {}){
+  const X = makeContext(items, C, opt.bags);
   const g = greedy(X);
   return toPacked(X, g.bags, g.sol);
 }
@@ -355,7 +395,7 @@ function improve(packed, onDone){
   let stopped = false, ann = null;
   const tick = () => {
     if(stopped) return;
-    if(!ann) ann = createAnnealer(S.X, S.sol, { iters: PACKING.iters, seed: seedFrom(S.X), W: PACKING.weights });
+    if(!ann) ann = createAnnealer(S.X, S.sol, { iters: PACKING.iters, seed: seedFrom(S.X), W: weightsFor(S.X) });
     const t0 = performance.now();
     while(!ann.done && performance.now() - t0 < 12) ann.step(4);
     if(!ann.done){ setTimeout(tick, 0); return; }

@@ -137,6 +137,19 @@ footer{font-size:12px;color:var(--muted)}
 .seg .mybag > button.del.armed{background:var(--warn);border-color:var(--warn);color:#fff}
 .seg button.add{border-style:dashed;color:var(--muted)}
 .seg button.add:hover{color:var(--ink);border-color:var(--ink)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+
+/* 袋の数・種類を決めたとき：決めた袋の一覧と、選択肢に付く「×2」 */
+.seg .slot{display:inline-flex;align-items:center;font-size:14px;padding:6px 12px;border-radius:999px 0 0 999px;border:1px solid var(--ink);border-right:0;background:var(--ink);color:var(--ground)}
+.seg .slot small{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px}
+.seg .mybag > .slot + button.del{border-color:var(--ink)}
+.seg button .cnt{font-family:var(--mono);font-size:11px;font-weight:700;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--accent-ink)}
+
+/* 入りきらなかった物 */
+.leftover{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--warn);background:var(--surface)}
+.leftover[hidden]{display:none}
+.leftover .label{color:var(--warn)}
+.leftnote{margin:0;font-size:13px;color:var(--muted)}
 .bagform{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:var(--sunk);border:1px solid var(--line)}
 .bf-field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .bf-field label{font-size:12px;font-weight:700;color:var(--muted)}
