@@ -1,5 +1,5 @@
 // Claudeへの問い合わせ（レシートの読み取り）
-// 今は claude.ai の sample 機能を使う。API版にするときは analyze() の中身だけ差し替えればよい。
+// claude.ai の中では sample 機能を使い、外ではNodeサーバー（server/server.js）経由で Claude Agent SDK を使う。
 (function(App){
 "use strict";
 const { num } = App.util;
@@ -7,16 +7,55 @@ const { KINDS } = App.config;
 // 指示文に入れる種類の一覧（例 "pk=紙パック飲料 pb=ペットボトル ..."）。config.js の KINDS と必ず同じになる
 const KIND_CODES = Object.entries(KINDS).map(([k, v]) => `${k}=${v.label}`).join(" ") + " 当てはまらなければ\"\"";
 
-let sample = null, imgLimits = null;
+let sample = null, imgLimits = null, passcodeNeeded = false;
+const PASS_KEY = "fukurozume.passcode";
 
 // 戻り値: { available, imgLimits }  imgLimits は写真を送れないときは null
+// claude.ai の中なら sample 機能、外なら同じサーバーの /api/analyze（server/server.js）を使う
 async function init(){
   try { sample = window.claude ? await window.claude.use("sample") : null; } catch { sample = null; }
   if(sample){
     const lim = await sample.limits().catch(() => null);
     imgLimits = lim?.images ?? null;
+    return { available: true, imgLimits };
   }
-  return { available: !!sample, imgLimits };
+  try{
+    const r = await fetch("/api/health", { cache: "no-store" });
+    if(!r.ok) return { available: false, imgLimits: null };
+    const h = await r.json();
+    passcodeNeeded = !!h.passcode;
+    imgLimits = h.limits?.images ?? null;
+    return { available: !!h.ok, imgLimits };
+  }catch{ return { available: false, imgLimits: null }; }
+}
+
+const toBase64 = blob => new Promise((ok, ng) => {
+  const fr = new FileReader();
+  fr.onload = () => ok(String(fr.result).split(",")[1] || "");
+  fr.onerror = () => ng(fr.error);
+  fr.readAsDataURL(blob);
+});
+
+function passcode(retry){
+  let p = "";
+  try{ p = localStorage.getItem(PASS_KEY) || ""; }catch{}
+  if(!p || retry){
+    p = window.prompt("合言葉を入力してください") || "";
+    try{ localStorage.setItem(PASS_KEY, p); }catch{}
+  }
+  return p;
+}
+
+async function postAnalyze(body, signal, retry){
+  const headers = { "content-type": "application/json" };
+  if(passcodeNeeded) headers["x-passcode"] = passcode(retry);
+  let r;
+  try{ r = await fetch("/api/analyze", { method: "POST", headers, body, signal }); }
+  catch(e){ throw Object.assign(new Error("network"), { code: e?.name === "AbortError" ? "cancelled" : "network" }); }
+  if(r.status === 401 && passcodeNeeded && !retry) return postAnalyze(body, signal, true);
+  const data = await r.json().catch(() => null);
+  if(!r.ok) throw Object.assign(new Error("api"), { code: data?.error?.code || "unknown" });
+  return data;
 }
 
 function buildPrompt(nR, hasBox){
@@ -67,8 +106,10 @@ function normalize(raw){
 
 // images: Blob[]（レシート → 袋・箱の順）
 async function analyze({ images, nReceipts, hasBox, signal, onText }){
-  const raw = await sample.json(buildPrompt(nReceipts, hasBox), { images, signal, onText });
-  return normalize(raw);
+  const prompt = buildPrompt(nReceipts, hasBox);
+  if(sample) return normalize(await sample.json(prompt, { images, signal, onText }));
+  const imgs = await Promise.all(images.map(async b => ({ type: b.type || "image/jpeg", data: await toBase64(b) })));
+  return normalize(await postAnalyze(JSON.stringify({ prompt, images: imgs }), signal, false));
 }
 
 const ERR = {
