@@ -79,7 +79,7 @@ async function analyze(req, res){
         tools: ["Read"],
         maxTurns: 4,
         settingSources: [],
-        systemPrompt: "あなたはレシート解析器です。指示されたJSONだけを返答し、それ以外は書きません。",
+        systemPrompt: "あなたはレシートや、袋・箱の写真の解析器です。指示されたJSONだけを返答し、それ以外は書きません。",
         // Readは一時フォルダの中だけ。それ以外は何も許可しない
         canUseTool: async (tool, input) => {
           const target = typeof input?.file_path === "string" ? path.resolve(input.file_path) : "";

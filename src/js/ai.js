@@ -92,12 +92,41 @@ function normalize(raw){
            warnings:(Array.isArray(r.w) ? r.w : []).map(String).filter(Boolean).slice(0, 6) };
 }
 
+// 画像つきで問い合わせ、JSONの返答をそのまま返す（claude.ai なら sample、外ならサーバー経由）
+async function ask(prompt, images, signal, onText){
+  if(sample) return sample.json(prompt, { images, signal, onText });
+  const imgs = await Promise.all(images.map(async b => ({ type: b.type || "image/jpeg", data: await toBase64(b) })));
+  return postAnalyze(JSON.stringify({ prompt, images: imgs }), signal);
+}
+
 // images: Blob[]（レシート → 袋・箱の順）
 async function analyze({ images, nReceipts, hasBox, signal, onText }){
-  const prompt = buildPrompt(nReceipts, hasBox);
-  if(sample) return normalize(await sample.json(prompt, { images, signal, onText }));
-  const imgs = await Promise.all(images.map(async b => ({ type: b.type || "image/jpeg", data: await toBase64(b) })));
-  return normalize(await postAnalyze(JSON.stringify({ prompt, images: imgs }), signal));
+  return normalize(await ask(buildPrompt(nReceipts, hasBox), images, signal, onText));
+}
+
+// マイバッグ登録用：袋・箱1つの写真から、内寸と耐荷重の目安を推定する
+const BAG_PROMPT = `画像は買い物に使う袋（エコバッグ・レジ袋など）か箱（段ボールなど）1つ。
+内寸を推定する。物差しは写っている物を使う（レシートの幅58/80mm、A4用紙21×29.7cm、500mlペットボトルの高さ約21cm、手のひら、段ボールのサイズ表記・印字など）。
+袋は 幅=口の横幅、奥行=まち、高さ=底から持ち手の付け根まで。まちが見えなければ幅の半分程度。
+JSONのみで返答：
+{"n":"名前(例 青いエコバッグ。15字以内)","k":"g(袋)かb(箱)","s":[幅cm,奥行cm,高さcm],"kg":耐荷重の目安kg,"r":"物差しにした物(20字以内。無ければ\\"見た目\\")","c":物差しがあれば1、無ければ0}
+袋も箱も写っていなければ "s":null とし、r に理由。`;
+
+// 戻り値: { name, kind:"bag"|"box", W, D, H, kg, ruler, confident }。袋・箱が写っていなければ { none:true, reason }
+async function measureBag({ image, signal }){
+  const r = await ask(BAG_PROMPT, [image], signal);
+  const s = Array.isArray(r?.s) ? r.s.map(Number) : null;
+  if(!s || !(s[0] > 0 && s[1] > 0 && s[2] > 0)) return { none: true, reason: String(r?.r ?? "") };
+  const box = r.k === "b";
+  return {
+    name: String(r.n ?? "").slice(0, 20),
+    kind: box ? "box" : "bag",
+    // 範囲はマイバッグの入力欄と同じ
+    W: Math.round(num(s[0], 5, 150, 38)), D: Math.round(num(s[1], 3, 150, 20)), H: Math.round(num(s[2], 5, 150, 32)),
+    kg: Math.round(num(r.kg, 1, 50, box ? 15 : 10)),
+    ruler: String(r.r ?? "").slice(0, 30),
+    confident: Number(r.c) !== 0
+  };
 }
 
 const ERR = {
@@ -113,5 +142,5 @@ const ERR = {
 };
 const errorMessage = code => ERR[code] || "解析に失敗しました。通信状況を確認して、もう一度押してください。";
 
-App.ai = { init, analyze, errorMessage };
+App.ai = { init, analyze, measureBag, errorMessage };
 })(window.App = window.App || {});

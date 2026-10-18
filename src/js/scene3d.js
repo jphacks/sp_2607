@@ -3,7 +3,8 @@
 "use strict";
 const { reduceMotion } = App.util;
 
-let renderer, scene, camera, root, stage, meshes = [], packed = null, curStep = 0;
+let renderer, scene, camera, root, stage, meshes = [], packed = null, curStep = 0, curBag = 0;
+let bagViews = [];   // 袋ごとの { x:中心, W, D, top:描いた物の一番上 }。今の袋だけを映すのに使う
 const view = { rotY:-0.7, tilt:0.55, dist:120, base:120, target:null };
 const ready = typeof THREE !== "undefined";
 
@@ -68,6 +69,23 @@ function resize(){
   const r = stage.getBoundingClientRect();
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+  fitView();
+}
+// 今の袋が画面いっぱいに収まる距離にカメラを置く（縦は袋の高さ、横は袋の対角線で合わせる）
+function fitView(){
+  const b = bagViews[curBag];
+  if(!b) return;
+  const t = Math.tan(camera.fov * Math.PI / 360);
+  view.target = new THREE.Vector3(b.x, b.top * 0.4, 0);
+  view.base = 1.08 * Math.max(b.top * 0.6, Math.hypot(b.W, b.D) * 0.55 / Math.max(0.3, camera.aspect)) / t;
+  view.dist = view.base;
+}
+// i番目の袋だけを表示する
+function focusBag(i){
+  if(!ready || !bagViews.length) return;
+  curBag = Math.max(0, Math.min(bagViews.length - 1, i));
+  root.children.forEach((g, k) => { g.visible = k === curBag; });
+  fitView();
 }
 // 後片付け。保存してあるモデルの形データ（keep）と札の画像（keep）は、使い回すので捨てない
 function disposeAll(){
@@ -166,7 +184,7 @@ function makeLabel(text, worldH){
   return sp;
 }
 function drawLabel(text){
-  const fs = 44, pad = 14, c = document.createElement("canvas"), g = c.getContext("2d");
+  const fs = 56, pad = 16, c = document.createElement("canvas"), g = c.getContext("2d");
   const font = `700 ${fs}px "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif`;
   g.font = font;
   const tw = Math.ceil(g.measureText(text).width);
@@ -191,17 +209,19 @@ function show(packedResult, steps){
   const Cs = bags.length ? bags.map(b => b.C || C) : [C];
   const maxW = Math.max(...Cs.map(c => c.W)), gap = maxW * 0.35;
   const span = Cs.reduce((s, c) => s + c.W, 0) + (Cs.length - 1) * gap;
-  let topY = C.H, x = -span / 2;
-  for(const Cb of Cs){
+  let x = -span / 2;
+  bagViews = Cs.map(Cb => {
     const g = new THREE.Group(); g.position.x = x + Cb.W / 2; x += Cb.W + gap; root.add(g);
-    topY = Math.max(topY, Cb.kind === "box" ? addBox(g, Cb) : addBag(g, Cb));
-  }
-  const labelH = Math.max(2.2, maxW * 0.085);
+    const top = Cb.kind === "box" ? addBox(g, Cb) : addBag(g, Cb);
+    return { x: g.position.x, W: Cb.W, D: Cb.D, top };
+  });
   placed.forEach(p => {
     const { holder, mats } = itemObject(p);
     root.children[p.bag].add(holder);
     let label = null;
     if(p.first){
+      // 袋1つを画面いっぱいに映すので、札は袋の幅の1割強の大きさにする
+      const labelH = Math.max(2.4, (Cs[p.bag] || C).W * 0.12);
       label = makeLabel(p.name, labelH);
       label.position.set(0, p.h / 2 + labelH * 0.8, 0);
       label.visible = false;
@@ -209,16 +229,16 @@ function show(packedResult, steps){
     }
     meshes.push({ m:holder, mats, label, step: p.step, y:p.y, t0:0 });
   });
-  view.target = new THREE.Vector3(0, topY * 0.42, 0);
-  view.base = Math.max(span * 1.25, topY * 2.2) + 15;
-  view.dist = view.base;
+  curBag = 0;
   resize();
+  focusBag(0);
 }
 
-// k番目の手順までを表示。animate なら k番目の商品を上から落とす
-function setStep(k, animate){
+// k番目の手順までを表示。animate なら k番目の商品を上から落とす。bag: その手順の袋（その袋だけを映す）
+function setStep(k, animate, bag){
   curStep = k;
   if(!ready) return;
+  if(bag != null && bag !== curBag) focusBag(bag);
   const now = performance.now(), drop = packed ? packed.C.H : 30;
   for(const o of meshes){
     o.m.visible = o.step <= k;
@@ -252,5 +272,5 @@ function loop(now){
   renderer.render(scene, camera);
 }
 
-App.scene3d = { init, show, setStep };
+App.scene3d = { init, show, setStep, focusBag };
 })(window.App = window.App || {});
