@@ -97,7 +97,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);lin
 .g-count{flex:1;text-align:center;font-family:var(--mono);font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
 .g-bar{height:4px;border-radius:2px;background:var(--sunk);overflow:hidden}
 .g-bar span{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
-.stage{position:relative;flex:1;min-height:0;border-radius:16px;background:var(--surface);border:1px solid var(--line);overflow:hidden;touch-action:pan-y}
+.stage{position:relative;flex:1;min-height:0;border-radius:16px;background:var(--surface);border:1px solid var(--line);overflow:hidden;touch-action:none}
 .stage canvas{display:block;width:100%;height:100%}
 .now{display:flex;flex-direction:column;gap:10px;padding:2px 4px}
 .now-title{margin:0;font-size:14px;font-weight:700;color:var(--muted)}

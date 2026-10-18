@@ -4,8 +4,9 @@
 const { reduceMotion } = App.util;
 
 let renderer, scene, camera, root, stage, meshes = [], packed = null, curStep = 0, curBag = 0;
+const pts = new Map();   // いま3Dに触れている指（ポインター）
 let bagViews = [];   // 袋ごとの { x:中心, W, D, top:描いた物の一番上 }。今の袋だけを映すのに使う
-const view = { rotY:-0.7, tilt:0.55, dist:120, base:120, target:null };
+const view = { rotY:-0.7, tilt:0.55, dist:120, base:120, target:null, vel:0 };
 const ready = typeof THREE !== "undefined";
 
 // 戻り値: 3Dが使えるか
@@ -25,9 +26,9 @@ function init(canvas, stageEl){
   new ResizeObserver(resize).observe(stage);
 
   // マウス：ドラッグで回転と傾き、ホイールで拡大
-  // 指：1本で横になぞると回転（縦はページのスクロールに譲る）、2本でつまむと拡大・縮小、2本で上下になぞると傾き
+  // 指：1本でなぞると回転と傾き（離すと少し回り続ける）、2本でつまむと拡大・縮小、2本で上下になぞると傾き
+  // 3Dの上ではページをスクロールしない（touch-action:none）。手順の画面は高さが固定なのでスクロールは要らない
   const clampDist = v => Math.min(view.base * 2.5, Math.max(view.base * 0.4, v));
-  const pts = new Map();
   let pinch = null;
   const pinchState = () => {
     const [a, b] = [...pts.values()];
@@ -35,6 +36,7 @@ function init(canvas, stageEl){
   };
   stage.addEventListener("pointerdown", e => {
     pts.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    view.vel = 0;
     stage.setPointerCapture(e.pointerId);
     if(pts.size === 2){ const s = pinchState(); pinch = { d0:s.d, y0:s.y, dist0:view.dist, tilt0:view.tilt }; }
   });
@@ -49,12 +51,15 @@ function init(canvas, stageEl){
       view.tilt = Math.min(1.35, Math.max(0.05, pinch.tilt0 + (s.y - pinch.y0) * 0.008));
       return;
     }
-    view.rotY -= (cur.x - prev.x) * 0.01;
-    if(e.pointerType === "mouse") view.tilt = Math.min(1.35, Math.max(0.05, view.tilt + (cur.y - prev.y) * 0.008));
+    const dx = (cur.x - prev.x) * 0.01;
+    view.rotY -= dx;
+    view.vel = reduceMotion ? 0 : -dx;
+    view.tilt = Math.min(1.35, Math.max(0.05, view.tilt + (cur.y - prev.y) * (e.pointerType === "mouse" ? 0.008 : 0.006)));
   });
   ["pointerup","pointercancel","lostpointercapture"].forEach(ev => stage.addEventListener(ev, e => {
     pts.delete(e.pointerId);
     if(pts.size < 2) pinch = null;
+    if(pts.size) view.vel = 0;
   }));
   stage.addEventListener("wheel", e => { e.preventDefault(); view.dist = clampDist(view.dist * (1 + e.deltaY * 0.001)); }, { passive:false });
 
@@ -253,6 +258,7 @@ function loop(now){
   requestAnimationFrame(loop);
   if(!view.target) return;
   const t = view.target;
+  if(!pts.size && Math.abs(view.vel) > 0.0003){ view.rotY += view.vel; view.vel *= 0.92; } else if(!pts.size) view.vel = 0;
   camera.position.set(
     t.x + view.dist * Math.sin(view.rotY) * Math.cos(view.tilt),
     t.y + view.dist * Math.sin(view.tilt),
