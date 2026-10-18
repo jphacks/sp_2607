@@ -9,7 +9,6 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src");
 const PORT = Number(process.env.PORT) || 3000;
-const PASSCODE = process.env.APP_PASSCODE || "";
 const MAX_BODY = 20 * 1024 * 1024, MAX_IMAGES = 8, MAX_PROMPT = 4000, MAX_RUNNING = 2;
 const EXT = { "image/jpeg": "jpg", "image/png": "png" };
 const MIME = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json", ".svg":"image/svg+xml", ".png":"image/png", ".ico":"image/x-icon" };
@@ -50,7 +49,6 @@ function mapError(e){
 }
 
 async function analyze(req, res){
-  if(PASSCODE && req.headers["x-passcode"] !== PASSCODE) throw new ApiError(401, "not_granted");
   if(running >= MAX_RUNNING) throw new ApiError(429, "rate_limited");
   const body = await readJson(req);
   const { prompt, images } = body ?? {};
@@ -119,7 +117,7 @@ http.createServer(async (req, res) => {
   try{
     const { pathname } = new URL(req.url, "http://x");
     if(req.method === "GET" && pathname === "/api/health")
-      return send(res, 200, { ok: true, passcode: !!PASSCODE, limits: { images: { maxCount: MAX_IMAGES } } });
+      return send(res, 200, { ok: true, limits: { images: { maxCount: MAX_IMAGES } } });
     if(req.method === "POST" && pathname === "/api/analyze") return await analyze(req, res);
     if(req.method === "GET") return await serveStatic(req, res);
     res.writeHead(405).end();

@@ -35,11 +35,12 @@ JSファイルは `index.html` に書いた順に読み込まれ、それぞれ 
 
 ```
 claude setup-token          # CLAUDE_CODE_OAUTH_TOKEN を発行
-cp .env.example .env        # 発行したトークンと、任意の合言葉(APP_PASSCODE)を書く
+cp .env.example .env        # 発行したトークンを書く
 npm install
 npm start                   # http://localhost:3000
 ```
 
+- 合言葉などの認証はないので、URLを知っている人は誰でも解析できます（公開URLを広めないでください）。
 - 解析1回ごとに Claude Code が起動するため、API直叩きより数秒遅く、同時実行は2件までです。
 - 利用量は、トークンを発行したアカウントのサブスクリプション枠から引かれます。自分とチームのデモ用に限り、不特定多数への公開には使わないでください（その場合は `ANTHROPIC_API_KEY` で Messages API を呼ぶ形にします）。
 - `.env` は `.gitignore` 済みです。トークンをコミットしないでください。
