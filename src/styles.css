@@ -197,7 +197,9 @@ footer{font-size:12px;color:var(--muted)}
 .wrap.setup > *:not(header):not(.intake){display:none}
 .wrap.setup .tag{display:none}
 .wrap.setup .intake{grid-template-columns:1fr}
-.wrap.setup .go{flex-direction:column;align-items:stretch}
+.wrap.setup .go{flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+.wrap.setup .go .btn{flex:none}
+.wrap.setup .go .status{overflow-wrap:anywhere}
 .wrap.setup #goBtn{min-height:60px;font-size:19px;border-radius:14px;box-shadow:0 4px 0 #B8930C}
 .wrap.setup #goBtn:disabled{box-shadow:none}
 .setup-back{display:none}
