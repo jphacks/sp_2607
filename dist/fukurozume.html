@@ -1,4 +1,4 @@
-<title>袋づめ名人</title>
+<title>袋詰名人</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -2365,7 +2365,7 @@ async function onSubmit(e){
   if(!aiReady || !state.receipts.length || ctl) return;
   ctl = new AbortController();
   $("goBtn").disabled = true; $("stopBtn").hidden = false;
-  setStatus("レシートを読んでいます…（30秒〜1分ほどかかります）");
+  setStatus("レシートを読んでいます…");
   try{
     const data = await App.ai.analyze({
       images: [...state.receipts, ...state.boxPhoto].map(p => p.blob),
