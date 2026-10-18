@@ -5,7 +5,7 @@ const { $, el, fmt, reduceMotion } = App.util;
 const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
 const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
-let aiReady = false, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
+let aiReady = false, aiChecking = true, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
 // マイバッグ（bag-store.js に保存した袋・箱）を、袋詰めの計算で使う形にする
 const fromMyBag = b => ({ id:b.id, group:"マイバッグ", label:b.name, kind:b.kind, W:b.W, D:b.D, H:b.H, kg:b.kg });
 const myBags = () => App.bagStore.bags().map(fromMyBag);
@@ -185,7 +185,8 @@ function syncGo(updateStatus = true){
   const busy = !!ctl;
   $("goBtn").disabled = busy || !aiReady || !imgLimits || state.receipts.length === 0;
   if(busy || !updateStatus) return;
-  if(!aiReady) setStatus("このページをClaudeの画面で開くと、レシートを解析できます");
+  if(!aiReady && aiChecking) setStatus("Claudeに接続しています…");
+  else if(!aiReady) setStatus("このページをClaudeの画面で開くと、レシートを解析できます");
   else if(!imgLimits) setStatus("この環境では写真を送れません", true);
   else if(!state.receipts.length) setStatus("レシートを選ぶと解析できます");
   else{
@@ -430,7 +431,11 @@ function setScreen(name){
 }
 
 async function start(){
-  App.scene3d.init($("cv"), $("stage"));
+  // Claudeへの接続は最初に始め、ほかの準備が失敗しても結果を反映する
+  // 写真は image-prep.js で必ずJPEGに変換してから送るので、iPhoneのHEICなども選べるよう accept は image/* のままにする
+  App.ai.init().then(ai => { aiReady = ai.available; imgLimits = ai.imgLimits; }, () => {})
+    .finally(() => { aiChecking = false; syncGo(); });
+  try { App.scene3d.init($("cv"), $("stage")); } catch(e) { console.error(e); }
   wirePhotos($("receiptInput"), $("dzReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
   // 上の大きな「レシートを撮る」ボタンと「写真から選ぶ」。撮ったら最初の画面を抜けて、写真と「詰め方を考える」が見える位置へ
   // 結果の画面にいるとき（撮り直し・追加）は、画面は切り替えずに入力欄まで動かすだけ
@@ -463,11 +468,6 @@ async function start(){
       state.containerId = last; renderContainerSeg(); renderPack();
     }
   });
-
-  const ai = await App.ai.init();
-  // 写真は image-prep.js で必ずJPEGに変換してから送るので、iPhoneのHEICなども選べるよう accept は image/* のままにする
-  aiReady = ai.available; imgLimits = ai.imgLimits;
-  syncGo();
 }
 
 App.ui = { start };
