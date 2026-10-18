@@ -62,13 +62,14 @@ function buildPrompt(nR, hasBox){
   // 返答はキー名なしの配列にして、出力トークン（入力の5倍の単価）を減らす
   return `画像${nR}枚はレシート${nR > 1 ? "（分割撮影。重複行は1回だけ数える）" : ""}${hasBox ? "、最後の1枚は詰める袋か箱" : ""}。
 商品行ごとに1要素、レシートの上から順に（値引き・袋代・小計・税・支払い行は除く）：
-[名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信,種類]
+[名前と内容量(略称から推定。例 ｵｲｼｲｷﾞｭｳﾆｭｳ1000→牛乳1L),個数,幅cm,奥行cm,高さcm,1個kg,形,性質,温度,分別,確信,種類,載kg]
 形 b=箱・パック c=缶・ボトル・カップ s=袋物・野菜・パン
-性質 F=つぶれやすい U=立てないとこぼれる 両方ならFU なければ""
+性質 F=つぶれやすい U=立てないとこぼれる H=傾けず平らに置く(卵・トレー・豆腐) 複数なら並べる(例FH) なければ""
+載kg=上に載せても傷まない重さkg(例 ポテチ0.05 パン0.4 卵0.3 豆腐0.5 肉トレー2 硬い野菜・缶・飲料10)
 温度 f=冷凍 c=冷蔵 r=常温　分別 r=肉魚 x=洗剤など非食品 ""=なし　確信 1=特定できた 0=推測
 種類 ${KIND_CODES}
 ${hasBox ? "箱袋は内寸[幅,奥行,高さ(袋は持ち手の付け根まで),b=箱/g=袋]をレシート幅58/80mmやサイズ表記を物差しに推定。\n" : ""}JSONのみで返答：
-{"m":"詰め方の要点(30字以内)","c":${hasBox ? "[30,15,28,\"g\"]" : "null"},"i":[["卵10個パック",1,26,11,7,0.65,"b","F","c","",1,"eg"]],"w":["注意(なければ空)"]}
+{"m":"詰め方の要点(30字以内)","c":${hasBox ? "[30,15,28,\"g\"]" : "null"},"i":[["卵10個パック",1,26,11,7,0.65,"b","FH","c","",1,"eg",0.3]],"w":["注意(なければ空)"]}
 レシートが無ければ i を空にし m に理由。`;
 }
 
@@ -77,7 +78,7 @@ function normalize(raw){
   const r = raw && typeof raw === "object" ? raw : {};
   const SHAPE = { b:"box", c:"cylinder", s:"soft" }, TEMP = { f:"frozen", c:"chilled", r:"room" }, SEP = { r:"raw", x:"chemical" };
   const items = (Array.isArray(r.i) ? r.i : []).filter(Array.isArray).slice(0, 60).map((a, i) => {
-    const [name, qty, w, d, h, kg, shape, flags, temp, sep, conf, kind] = a;
+    const [name, qty, w, d, h, kg, shape, flags, temp, sep, conf, kind, cap] = a;
     const f = String(flags ?? "").toUpperCase();
     return {
       id: "i" + i, receipt: "", tip: "",
@@ -86,7 +87,8 @@ function normalize(raw){
       w: num(w, 0.5, 80, 10), d: num(d, 0.5, 80, 10), h: num(h, 0.5, 80, 10),
       kg: num(kg, 0, 30, 0.3),
       shape: SHAPE[shape] || "box",
-      fragile: f.includes("F"), upright: f.includes("U"),
+      fragile: f.includes("F"), upright: f.includes("U"), flat: f.includes("H"),
+      cap: num(cap, 0, 30, undefined), // 上に載せられる重さ。返ってこなければ packing.js が形から推定する
       temp: TEMP[temp] || "room",
       separate: SEP[sep] || "none",
       confident: Number(conf) !== 0,
