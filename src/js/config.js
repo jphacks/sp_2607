@@ -38,6 +38,7 @@ const STEP_TEXT = {
 //   weights:  評価関数の重み。項目の量 × 重み の合計が小さい詰め方ほど良い
 const PACKING = {
   anneal: true, iters: 500, slackBag: 5, slackBox: 0, mixChem: true,
+  maxItemsPerStep: 2,   // 1つの手順に出す商品の種類（個数は数えない）。3Dを広く見せるため
   weights: {
     bags: 1000,      // 袋の数（個）。袋の数・種類を指定したときは数えない
     left: 1000,      // 袋を指定したとき、入りきらずに余った商品（個）

@@ -360,12 +360,18 @@ function toPacked(X, bagStates, sol){
   // 1袋ずつ詰め終えてから次の袋へ進む順番にする（画面では今の袋だけを大きく映すため）。袋の中は入れる順のまま
   const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.bi - b.bi || a.p.u.i - b.p.u.i);
   // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）。袋が変わるところでも区切る
-  const stepOf = new Map(); let step = -1, prev = null, prevBag = -1;
-  for(const { p, bi } of recs){ if(p.u.rank !== prev || bi !== prevBag){ step++; prev = p.u.rank; prevBag = bi; } stepOf.set(p.u.i, step); }
+  // 1つの手順に出す商品は PACKING.maxItemsPerStep 種類まで（同じ商品を何個入れても1種類）。超えたら区切り、つづきの手順にする
+  const stepOf = new Map(), contStep = new Set(); let step = -1, prev = null, prevBag = -1, ids = new Set();
+  for(const { p, bi } of recs){
+    const split = p.u.rank !== prev || bi !== prevBag;
+    const over = !split && !ids.has(p.u.it.id) && ids.size >= PACKING.maxItemsPerStep;
+    if(split || over){ step++; prev = p.u.rank; prevBag = bi; ids = new Set(); if(over) contStep.add(step); }
+    ids.add(p.u.it.id); stepOf.set(p.u.i, step);
+  }
   const labeled = new Set(), placed = [], units = [];
   for(const { p, b, bi } of recs){
     const { u, r } = p, C = b.C;
-    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i), bag: bi });
+    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i), bag: bi, cont: contStep.has(stepOf.get(u.i)) });
     // o: 置いた向き（orientations() の番号）。raw: その向きでの縮める前の寸法。3Dで向きと縮尺を合わせるのに使う
     // first: 同じ商品が複数あるとき、名前の札を1つだけ出すための目印
     const first = !labeled.has(u.it.id); labeled.add(u.it.id);
@@ -410,7 +416,9 @@ function improve(packed, onDone){
 // 入れる順番どおりの手順。同じ袋で同じ段階が続くところは1つの手順にまとめる。bag: その手順で詰める袋の番号
 function buildSteps(packed){
   const steps = [];
-  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = { rank:u.rank, bag:u.bag, ...STEP_TEXT[u.rank] };
+  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = u.cont
+    ? { rank:u.rank, bag:u.bag, title:STEP_TEXT[u.rank].title + "（つづき）", detail:"同じ要領で、続けて入れます。" }
+    : { rank:u.rank, bag:u.bag, ...STEP_TEXT[u.rank] };
   return steps;
 }
 
