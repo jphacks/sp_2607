@@ -73,7 +73,7 @@ function resize(){
 function disposeAll(){
   root.traverse(o => {
     if(o.geometry && !o.geometry.userData.keep) o.geometry.dispose();
-    if(o.material){ if(o.material.map && !o.material.map.userData.keep) o.material.map.dispose(); o.material.dispose?.(); }
+    if(o.material){ if(o.material.map && !o.material.map.userData?.keep) o.material.map.dispose(); o.material.dispose?.(); }
   });
   root.clear(); meshes = [];
 }
@@ -155,6 +155,7 @@ function makeLabel(text, worldH){
   let tex = labelCache.get(text);
   if(!tex){
     tex = drawLabel(text);
+    tex.userData = tex.userData || {};   // three.js r128 の Texture には userData が無い
     tex.userData.keep = true;
     labelCache.set(text, tex);
     if(labelCache.size > 200){ const [k, old] = labelCache.entries().next().value; labelCache.delete(k); old.dispose(); }
