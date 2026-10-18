@@ -20,13 +20,37 @@ const DEFAULT_CONTAINER = "rl";
 
 const nameOf = c => c.id === "photo" || c.group === "マイバッグ" ? c.label : c.id === "eco" ? "エコバッグ" : c.group + " " + c.label + (c.kind === "box" ? "サイズ" : "");
 
-// 1 重い・立てる物 → 2 箱物 → 3 軽い物 → 4 つぶれやすい物 → 5 日用品は別袋
+// 1 重い・立てる物 → 2 箱物 → 3 軽い物 → 4 つぶれやすい物 → 5 日用品
 const STEP_TEXT = {
   1:{ title:"重い物・立てる物を底に", detail:"飲み物や缶詰など重い物を底に並べます。紙パックは立てて角に寄せると倒れません。" },
   2:{ title:"箱やパックで面をそろえる", detail:"箱物・トレーを平らに積んで、上に物を置ける面を作ります。" },
   3:{ title:"軽い物で隙間を埋める", detail:"野菜の袋や軽い物を、空いている隙間に入れます。" },
-  4:{ title:"つぶれやすい物を一番上に", detail:"卵・パン・お菓子は最後に、上にそっと置きます。この上には何も載せません。" },
-  5:{ title:"日用品は別の袋に", detail:"洗剤などは食品と同じ袋に入れず、別の袋にまとめます。" }
+  4:{ title:"つぶれやすい物を一番上に", detail:"卵・パン・お菓子は最後に、上にそっと置きます。この上には重い物を載せません。" },
+  5:{ title:"日用品は最後に", detail:"洗剤などは、空いている袋の端に立てて入れます。食品と同じ袋でも、液がこぼれないよう口を上にします。" }
+};
+
+// 詰め方の計算（packing.js）の設定
+//   anneal:   true なら、すぐ出した詰め方を後ろで焼きなまし法で磨き、良くなったら差し替える。false で磨かない
+//   iters:    焼きなましで試す回数。例の12〜26点で試すと、500回と1,500回で結果はほぼ同じだった
+//             （500回 ≒ パソコンで0.4〜1.3秒。袋・箱が大きいほど時間がかかる。スマホはその数倍）
+//   slackBag: 袋の口から何cmまではみ出してよいか（持ち手を結べる分）。slackBox は段ボール（フタが閉まる必要がある）
+//   mixChem:  true なら日用品を食品と同じ袋に入れてもよい（weights.mix の分だけ減点）。false なら必ず別の袋
+//   weights:  評価関数の重み。項目の量 × 重み の合計が小さい詰め方ほど良い
+const PACKING = {
+  anneal: true, iters: 500, slackBag: 5, slackBox: 0, mixChem: true,
+  weights: {
+    bags: 1000,      // 袋の数（個）
+    overflow: 60,    // はみ出してよい高さを超えた分（cm）
+    overweight: 200, // 耐荷重を超えた重さ（kg）
+    balance: 20,     // 食品の袋どうしの重さの差（kg）
+    cog: 25,         // Σ 重さ × 置いた高さ / 袋の高さ（重い物が上ほど大きい）
+    dead: 8,         // 物の下にできた隙間（L）
+    support: 40,     // 足元の半分以上が浮いている物（個）
+    crush: 300,      // つぶれやすい物に、載せてよい重さを超えて載った分（kg）。置き場所が無いときだけ起こる
+    cold: 30,        // 冷凍・冷蔵品が散らばった袋の数 − 1
+    raw: 15,         // 肉・魚の下にある食品（個）
+    mix: 30          // 食品と同じ袋に入った日用品（個）
+  }
 };
 
 // 商品の種類。3Dで本物らしい形に描き分けるのに使う（models.js）。color は一覧の色見本にも使う
@@ -52,5 +76,5 @@ const KINDS = {
   tx:{ label:"ティッシュ・紙製品", color:"#9AA7B0" }
 };
 
-App.config = { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf, STEP_TEXT, KINDS };
+App.config = { PALETTE, PRESETS, DEFAULT_CONTAINER, nameOf, STEP_TEXT, PACKING, KINDS };
 })(window.App = window.App || {});

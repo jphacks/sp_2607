@@ -312,10 +312,11 @@ function flagsOf(it){
   if(it.kg >= 0.7) f.push(["重い", ""]);
   if(it.upright) f.push(["立てる", ""]);
   if(it.fragile) f.push(["つぶれやすい", ""]);
+  if(it.flat) f.push(["平らに", ""]);
   if(it.temp === "frozen") f.push(["冷凍", "cold"]);
   if(it.temp === "chilled") f.push(["冷蔵", "cold"]);
   if(it.separate === "raw") f.push(["ポリ袋に", "warn"]);
-  if(it.separate === "chemical") f.push(["食品と別の袋", "warn"]);
+  if(it.separate === "chemical") f.push(["日用品", "warn"]);
   return f;
 }
 
@@ -359,11 +360,23 @@ function renderTable(){
   });
 }
 
+// 詰め直す。まず手早く詰めた結果を出し、後ろで焼きなましをして、良い詰め方が見つかったら差し替える（再生中は差し替えない）
+let stopImprove = () => {};
 function renderPack(){
-  stopPlay();
-  const d = state.data, C = container();
-  const items = d.items.filter(it => it.qty > 0);
+  stopPlay(); stopImprove();
+  const C = container(), items = state.data.items.filter(it => it.qty > 0);
   const packed = App.packing.pack(items, C);
+  showPacked(packed, items, C, true);
+  stopImprove = App.packing.improve(packed, better => {
+    stopImprove = () => {};
+    if(better && !playing) showPacked(better, items, C, false);
+    else $("searchTag")?.remove();
+  });
+}
+
+// searching: 「もっと良い詰め方を探しています」の札を出す
+function showPacked(packed, items, C, searching){
+  const d = state.data;
   lastPacked = packed;
   steps = App.packing.buildSteps(packed);
 
@@ -386,10 +399,12 @@ function renderPack(){
   const bt = $("bagtags"); bt.textContent = "";
   packed.bags.forEach((b, i) => {
     const pct = Math.round(b.top / C.H * 100);
-    const over = pct > 100 || b.kg > C.kg;
+    // 袋は持ち手を結ぶ分（packed.slack cm）までならはみ出してよい
+    const over = b.top > C.H + packed.slack + 0.5 || b.kg > C.kg;
     bt.append(el("span", "bagtag" + (over ? " over" : ""), `${i + 1}${unit}目 ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
   });
   if(C.kind === "bag") bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
+  if(searching){ const s = el("span", "bagtag note", "もっと良い詰め方を探しています…"); s.id = "searchTag"; bt.append(s); }
 
   // 手順
   const ol = $("steps"); ol.textContent = "";
