@@ -357,14 +357,15 @@ function toPacked(X, bagStates, sol){
     C: b.C, slack: b.slack, kg: b.kg, top: b.top, n: b.list.length,
     group: b.list.length && b.list.every(p => p.u.chem) ? "chem" : "food"
   }));
-  const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.p.u.i - b.p.u.i);
-  // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）
-  const stepOf = new Map(); let step = -1, prev = null;
-  for(const { p } of recs){ if(p.u.rank !== prev){ step++; prev = p.u.rank; } stepOf.set(p.u.i, step); }
+  // 1袋ずつ詰め終えてから次の袋へ進む順番にする（画面では今の袋だけを大きく映すため）。袋の中は入れる順のまま
+  const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.bi - b.bi || a.p.u.i - b.p.u.i);
+  // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）。袋が変わるところでも区切る
+  const stepOf = new Map(); let step = -1, prev = null, prevBag = -1;
+  for(const { p, bi } of recs){ if(p.u.rank !== prev || bi !== prevBag){ step++; prev = p.u.rank; prevBag = bi; } stepOf.set(p.u.i, step); }
   const labeled = new Set(), placed = [], units = [];
   for(const { p, b, bi } of recs){
     const { u, r } = p, C = b.C;
-    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i) });
+    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i), bag: bi });
     // o: 置いた向き（orientations() の番号）。raw: その向きでの縮める前の寸法。3Dで向きと縮尺を合わせるのに使う
     // first: 同じ商品が複数あるとき、名前の札を1つだけ出すための目印
     const first = !labeled.has(u.it.id); labeled.add(u.it.id);
@@ -406,10 +407,10 @@ function improve(packed, onDone){
   return () => { stopped = true; };
 }
 
-// 入れる順番どおりの手順。同じ段階が続くところは1つの手順にまとめる
+// 入れる順番どおりの手順。同じ袋で同じ段階が続くところは1つの手順にまとめる。bag: その手順で詰める袋の番号
 function buildSteps(packed){
   const steps = [];
-  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = { rank:u.rank, ...STEP_TEXT[u.rank] };
+  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = { rank:u.rank, bag:u.bag, ...STEP_TEXT[u.rank] };
   return steps;
 }
 

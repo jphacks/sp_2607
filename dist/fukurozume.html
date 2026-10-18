@@ -27,8 +27,9 @@
   --bag-line:#9DB6AB; --bag-fill:#6F8C80; --warn:#F08A62; --ok:#6CC79A; --cold:#7DB4EE;
 }
 *{box-sizing:border-box}
-body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
-.wrap{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;display:flex;flex-direction:column;gap:28px}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
+/* スマホ専用アプリなので、PCで開いてもスマホの画面幅（430px）の1列で表示する */
+.wrap{max-width:430px;margin:0 auto;padding-inline:16px;padding-block:16px 48px;display:flex;flex-direction:column;gap:22px}
 h1,h2,h3{text-wrap:balance;margin:0}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:14px}
@@ -38,8 +39,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);lin
 .label{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--muted)}
 
 /* input */
-.intake{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;grid-template-columns:1fr 1.15fr;gap:24px}
-@media (max-width:760px){.intake{grid-template-columns:1fr}}
+.intake{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;grid-template-columns:1fr;gap:24px}
 .col{display:flex;flex-direction:column;gap:16px;min-width:0}
 .field{display:flex;flex-direction:column;gap:8px}
 .dropzone{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:132px;border:2px dashed var(--line);border-radius:10px;background:var(--sunk);cursor:pointer;text-align:center;padding:14px;transition:border-color .15s}
@@ -61,7 +61,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);lin
 .seg button small{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px}
 .seggroup{display:flex;flex-direction:column;gap:6px}
 .seggroup .sub{font-size:12px;color:var(--muted)}
-.seg button:focus-visible,.btn:focus-visible,.stepbtn:focus-visible,.ctl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg button:focus-visible,.btn:focus-visible,.g-close:focus-visible,.ctl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .go{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
 .btn{font:inherit;font-weight:700;font-size:16px;padding:12px 22px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
 .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -69,33 +69,54 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);lin
 .status{font-size:14px;color:var(--muted)}
 .status.err{color:var(--warn)}
 
-/* results */
-.banner{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:10px 14px;border-radius:10px;background:var(--sunk);font-size:14px}
+/* ---------- 結果の画面（overview まとめ / guide 1手順ずつ / done 詰め終わり / items 買った物）。選んだ画面だけを出す ---------- */
+/* #app のクラス（overview など）が今の画面。各画面の section は id で指す（クラス名がぶつかるため） */
+.screen{display:none}
+.wrap.overview > #overview,.wrap.guide > #guide,.wrap.done > #done,.wrap.items > #itemsScreen{display:flex}
+.wrap:is(.overview,.guide,.done,.items) > :is(.start,.intake){display:none}
+.wrap:is(.overview,.guide,.done,.items) .tag{display:none}
+.wrap:is(.guide,.done) > header{display:none}
+.btn.big{min-height:60px;font-size:19px;border-radius:14px;box-shadow:0 4px 0 #B8930C}
+
+/* まとめ：何袋に分けるかと、袋ごとの重さだけ */
+#overview{flex-direction:column;gap:18px}
+.banner{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;margin:0;padding:10px 14px;border-radius:10px;background:var(--sunk);font-size:13px}
 .banner b{font-weight:700}
-.head{display:flex;flex-direction:column;gap:12px}
-.store{font-size:13px;color:var(--muted)}
-.summary{font-size:clamp(18px,3vw,22px);font-weight:700;line-height:1.5;margin:0;max-width:40em}
-.stats{display:flex;flex-wrap:wrap;gap:10px 32px}
-.stat{display:flex;flex-direction:column}
-.stat .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:22px;line-height:1.3}
-.stat .v small{font-family:var(--body);font-size:13px;color:var(--muted);margin-left:3px}
-.stat .k{font-size:12px;color:var(--muted);letter-spacing:.06em}
-.stat .v.bad{color:var(--warn)}
-.main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px;align-items:start}
-@media (max-width:860px){.main{grid-template-columns:1fr}}
-.viewer{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.stage{position:relative;aspect-ratio:4/3.3;max-width:100%;cursor:grab;touch-action:pan-y}
-.stage:active{cursor:grabbing}
+.banner[hidden]{display:none}
+.ov-title{font-family:var(--display);font-weight:400;font-size:30px;line-height:1.3;letter-spacing:.02em}
+.ov-sub{margin:-10px 0 0;font-size:15px;color:var(--muted)}
+.ov-search{font-size:12px}
+.ov-bags{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ov-bags li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 18px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.ov-bags b{font-size:18px}
+.ov-bags span{font-family:var(--mono);font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ov-bags li.over{border-color:var(--warn)}
+.ov-bags li.over span{color:var(--warn)}
+.ov-links{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 16px}
+
+/* 手順：画面いっぱいに1手順。どこをタップしても次へ進む */
+.wrap.guide{padding-block:10px}
+#guide{flex-direction:column;gap:10px;height:calc(100vh - 20px);height:calc(100dvh - 20px);min-height:480px;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.g-top{display:flex;align-items:center;gap:10px}
+.g-close{font:inherit;font-size:24px;line-height:1;width:44px;height:44px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.g-count{flex:1;text-align:center;font-family:var(--mono);font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.g-bar{height:4px;border-radius:2px;background:var(--sunk);overflow:hidden}
+.g-bar span{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+.stage{position:relative;flex:1;min-height:0;border-radius:16px;background:var(--surface);border:1px solid var(--line);overflow:hidden;touch-action:pan-y}
 .stage canvas{display:block;width:100%;height:100%}
-.hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);pointer-events:none}
-.bagtags{position:absolute;top:10px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
-.bagtag{font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:6px;background:var(--ground);border:1px solid var(--line);font-variant-numeric:tabular-nums}
-.bagtag.over{color:var(--warn);border-color:var(--warn)}
-.bagtag.note{font-family:var(--body)}
-.controls{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.now{display:flex;flex-direction:column;gap:10px;padding:2px 4px}
+.now-title{margin:0;font-size:14px;font-weight:700;color:var(--muted)}
+.now-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.now-items li{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:start;gap:12px}
+.now-items .sw{width:16px;height:16px;border-radius:4px;margin-top:10px}
+.now-txt{display:flex;flex-direction:column}
+.now-items b{font-size:26px;line-height:1.3}
+.now-where{font-size:16px;color:var(--muted)}
+.g-foot{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.g-foot .pick{text-decoration:none;padding:12px 8px}
+.g-foot .pick:disabled{visibility:hidden}
+.g-tap{font-size:13px;color:var(--muted)}
 .ctl{font:inherit;font-size:14px;min-width:40px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--ground);color:var(--ink);cursor:pointer}
-.ctl.play{background:var(--ink);color:var(--ground);border-color:var(--ink);font-weight:700}
-.stepnow{flex:1;font-size:13px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
 .ctl.voice{display:inline-flex;align-items:center;gap:5px}
 .ctl.voice[hidden]{display:none}
 .ctl.voice svg{width:20px;height:20px}
@@ -103,13 +124,20 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);lin
 .ctl.voice[aria-pressed="true"] .mute, .ctl.voice[aria-pressed="false"] .wave{display:none}
 .ctl.voice[aria-pressed="false"]{color:var(--muted)}
 
-.steps-lead{margin:0 0 10px;font-size:13px;color:var(--muted)}
-.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.stepbtn{width:100%;text-align:left;font:inherit;color:inherit;display:grid;grid-template-columns:36px 1fr;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
-.stepbtn[aria-current="step"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.stepbtn .n{font-family:var(--display);font-size:22px;line-height:1.2;color:var(--accent-text)}
-.stepbtn h3{font-size:15px;font-weight:700;line-height:1.5}
-.stepbtn p{margin:2px 0 6px;font-size:14px;color:var(--muted)}
+/* 詰め終わり */
+#done{flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px;min-height:calc(100vh - 64px);min-height:calc(100dvh - 64px)}
+.done-mark{width:88px;height:88px}
+#done h2{font-family:var(--display);font-weight:400;font-size:30px}
+.done-text{margin:0;font-size:16px;color:var(--muted)}
+#done .btn{width:100%}
+
+/* 買った物（まとめから開く） */
+#itemsScreen{flex-direction:column;gap:12px}
+#itemsScreen .back{align-self:flex-start;text-decoration:none;padding:8px 0}
+#itemsScreen h2{font-size:17px;font-weight:700}
+#warnSec{display:flex;flex-direction:column;gap:8px}
+#warnSec[hidden]{display:none}
+
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:1px 8px 1px 6px;border-radius:6px;background:var(--sunk)}
 .sw{width:9px;height:9px;border-radius:2px;flex:none}
@@ -156,6 +184,15 @@ footer{font-size:12px;color:var(--muted)}
 .leftover .label{color:var(--warn)}
 .leftnote{margin:0;font-size:13px;color:var(--muted)}
 .bagform{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:12px;background:var(--sunk);border:1px solid var(--line)}
+.bagform[hidden]{display:none}
+.bf-photo{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;border:2px dashed var(--line);background:var(--ground);cursor:pointer;transition:border-color .15s}
+.bf-photo:hover,.bf-photo:focus-within{border-color:var(--accent)}
+.bf-photo input{position:absolute;opacity:0;width:1px;height:1px}
+.bf-photo svg{width:32px;height:32px;flex:none;color:var(--ink)}
+.bf-photo-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.bf-photo-text b{font-size:15px}
+.bf-photo-text small{font-size:12px;color:var(--muted)}
+.bf-photo.busy{opacity:.6;pointer-events:none}
 .bf-field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .bf-field label{font-size:12px;font-weight:700;color:var(--muted)}
 .bagform input{font:inherit;font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--ground);color:var(--ink);width:100%}
@@ -211,6 +248,21 @@ footer{font-size:12px;color:var(--muted)}
 .bp-list[hidden]{display:none}
 .bp-list .seggroup:first-child{margin-top:8px}
 
+/* 画面上部に固定する「袋づめ名人」（最初の画面以外）。押すと最初の画面へ */
+.topbar{display:none}
+.wrap:not(.intro) .topbar{display:flex;position:fixed;top:0;left:0;right:0;z-index:50;align-items:center;gap:10px;padding:8px max(16px,calc((100vw - 430px)/2 + 16px));border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-family:var(--display);font-size:20px;letter-spacing:.02em;text-align:left;cursor:pointer}
+.topbar .logo{width:30px;height:30px}
+.topbar:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.wrap:not(.intro){padding-top:76px}
+.wrap:not(.intro) header .brand{display:none}
+.wrap:not(.intro) header{margin-top:-8px}
+/* 手順・詰め終わりの画面は画面いっぱいに使うので、上のバーは出さない（手順の画面は「×」で戻る） */
+.wrap:is(.guide,.done) .topbar{display:none}
+.wrap.guide{padding-top:10px}
+.wrap.done{padding-top:16px}
+/* 結果の画面では入力欄を隠す */
+.wrap:not(.intro):not(.setup) .intake{display:none}
+
 /* 撮ったあとの画面：レシートの確認と、袋・箱の選択だけを出す */
 .wrap.setup > *:not(header):not(.intake){display:none}
 .wrap.setup .tag{display:none}
@@ -222,64 +274,66 @@ footer{font-size:12px;color:var(--muted)}
 .wrap.setup #goBtn:disabled{box-shadow:none}
 .setup-back{display:none}
 .wrap.setup .setup-back{display:inline-block;align-self:center}
-.hint .touch{display:none}
 
 /* ---------- 指で操作する端末 ---------- */
 @media (pointer:coarse){
-  .hint .mouse{display:none}
-  .hint .touch{display:inline}
   .seg button{min-height:44px;padding:8px 14px}
   .ctl{height:44px;min-width:48px}
   .thumb{width:72px;height:72px}
   .thumb button{width:30px;height:30px;font-size:15px}
-  .stepbtn{padding:14px}
   /* 16px未満だとiPhoneが入力時に画面を拡大してしまう */
   input[type="number"], td input[type="number"], .bagform input{font-size:16px}
   .seg .mybag > button.del{min-width:40px}
 }
 
-/* ---------- タブレット・スマホ ---------- */
-@media (max-width:860px){
-  /* 手順を押したときも3Dが見えているよう、手順の一覧を読んでいる間は3Dを上に固定する */
-  .viewer{top:env(safe-area-inset-top,0px);z-index:2;box-shadow:0 6px 18px rgba(0,0,0,.12)}
-  .stage{aspect-ratio:auto;height:min(44vh,88vw)}
-}
+/* ---------- スマホ幅のレイアウト（PCでもこの幅で表示） ---------- */
+.tag{font-size:13px}
+.intake{padding:16px;gap:20px}
+.dropzone{min-height:104px}
+.go .btn:not(.ghost){flex:1 1 100%}
+.bf-dims{grid-template-columns:repeat(2,minmax(0,1fr))}
 
-/* ---------- スマホ ---------- */
-@media (max-width:640px){
-  .wrap{padding-inline:16px;padding-block:16px 48px;gap:22px}
-  .tag{font-size:13px}
-  .intake{padding:16px;gap:20px}
-  .dropzone{min-height:104px}
-  .go .btn:not(.ghost){flex:1 1 100%}
-  .bf-dims{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .stats{gap:8px 22px}
-  .stat .v{font-size:19px}
-  .controls{padding:8px 10px}
-  .ctl.play{flex:1}
-  .stepnow{flex:none}
+/* 買った物の一覧：表をやめて、1商品ずつのカードにする */
+.tablewrap{overflow:visible}
+table{min-width:0}
+thead{display:none}
+table, tbody{display:block}
+tr{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding:14px;border-bottom:1px solid var(--line)}
+tr:last-child{border-bottom:0}
+td{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:0;border:0}
+td[data-label]:not([data-label=""])::before{content:attr(data-label);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+td.c-name, td.c-dims, td.c-flags{grid-column:1 / -1}
+td.c-name{flex-direction:row;flex-wrap:wrap;align-items:center}
+td input[type="number"]{width:64px;padding:8px}
+td input[type="number"].q{width:64px}
+.dims{gap:6px}
 
-  /* 買った物の一覧：表をやめて、1商品ずつのカードにする */
-  .tablewrap{overflow:visible}
-  table{min-width:0}
-  thead{display:none}
-  table, tbody{display:block}
-  tr{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding:14px;border-bottom:1px solid var(--line)}
-  tr:last-child{border-bottom:0}
-  td{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:0;border:0}
-  td[data-label]:not([data-label=""])::before{content:attr(data-label);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
-  td.c-name, td.c-dims, td.c-flags{grid-column:1 / -1}
-  td.c-name{flex-direction:row;flex-wrap:wrap;align-items:center}
-  td input[type="number"]{width:64px;padding:8px}
-  td input[type="number"].q{width:64px}
-  .dims{gap:6px}
+/* PCなど広い画面では、スマホの画面のように周りを一段暗くして1列を目立たせる */
+@media (min-width:600px){
+  body{background:var(--sunk)}
+  .wrap{background:var(--ground);min-height:100vh;min-height:100dvh;box-shadow:0 0 0 1px var(--line)}
 }
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.head,.intake{scroll-margin-top:64px}
+.banner[hidden]{display:none}
+/* 結果の画面では「レシートを撮る」も隠す（撮り直しは上の「袋づめ名人」から） */
+.wrap:not(.intro):not(.setup) .start{display:none}
+/* 結果の画面では説明文も隠す */
+.wrap:not(.intro):not(.setup) .tag{display:none}
 </style>
 
-<!-- 画面は3段階：intro（「レシートを撮る」だけ）→ setup（レシートの確認と袋・箱の選択）→ クラスなし（結果） -->
+<!-- 画面：intro（「レシートを撮る」だけ）→ setup（レシートの確認と袋・箱の選択）→ overview（まとめ）→ guide（1手順ずつ）→ done。items は買った物の確認 -->
 <div class="wrap intro" id="app">
+  <!-- 画面の上に固定。押すと最初の画面に戻る（最初の画面では大きな見出しがあるので出さない） -->
+  <button type="button" class="topbar" id="homeBtn" aria-label="最初の画面に戻る">
+    <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+      <path d="M8 16 L36 16 L33 40 L11 40 Z" fill="var(--accent)" />
+      <path d="M15 16 C15 8 20 6 22 11 C24 6 29 8 29 16" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="22" cy="13" r="2.6" fill="var(--ink)"/>
+    </svg>
+    <span>袋詰名人</span>
+  </button>
   <header>
     <div class="brand">
       <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
@@ -287,7 +341,7 @@ footer{font-size:12px;color:var(--muted)}
         <path d="M15 16 C15 8 20 6 22 11 C24 6 29 8 29 16" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
         <circle cx="22" cy="13" r="2.6" fill="var(--ink)"/>
       </svg>
-      <h1>袋づめ名人</h1>
+      <h1>袋詰名人</h1>
     </div>
     <p class="tag">レシートを撮るだけ。買った物をどの順で、どの袋に詰めればいいか、3Dで先に見せます。</p>
   </header>
@@ -343,6 +397,16 @@ footer{font-size:12px;color:var(--muted)}
             <label for="bfName">名前</label>
             <input type="text" id="bfName" maxlength="20" placeholder="例：いつものエコバッグ">
           </div>
+          <!-- 袋・箱を撮ると、AIが大きさを推定して下の欄に入れる -->
+          <label class="bf-photo" id="bfPhotoBtn">
+            <input type="file" id="bfPhoto" accept="image/*">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5h3.6l2-3h5.8l2 3h3.6v12h-17z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.9" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>
+            <span class="bf-photo-text">
+              <b>写真から大きさを測る</b>
+              <small>レシートやA4の紙を横に置いて撮ると正確になります</small>
+            </span>
+          </label>
+          <div class="thumbs" id="bfPhotoThumb"></div>
           <div class="seg" id="bfKind" role="group" aria-label="袋か箱か">
             <button type="button" data-v="bag" aria-pressed="true">袋</button>
             <button type="button" data-v="box" aria-pressed="false">箱</button>
@@ -375,46 +439,57 @@ footer{font-size:12px;color:var(--muted)}
     </div>
   </form>
 
-  <div class="banner" id="banner"><b>表示中：サンプル</b><span>スーパーで12点買った例です。レシートを送ると、あなたの買い物に置き換わります。</span></div>
-
-  <div class="head">
-    <span class="store" id="store"></span>
-    <p class="summary" id="summary"></p>
-    <div class="stats" id="stats"></div>
-  </div>
-
-  <div class="main">
-    <div class="viewer">
-      <div class="stage" id="stage">
-        <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
-        <div class="bagtags" id="bagtags"></div>
-        <div class="hint"><span class="mouse">ドラッグで回転・ホイールで拡大</span><span class="touch">横になぞって回転・2本指で拡大</span></div>
-      </div>
-      <div class="controls">
-        <button type="button" class="ctl" id="prevBtn" aria-label="前の手順">◀</button>
-        <button type="button" class="ctl play" id="playBtn">最初から再生</button>
-        <button type="button" class="ctl" id="nextBtn" aria-label="次の手順">▶</button>
-        <button type="button" class="ctl voice" id="voiceBtn" aria-pressed="true" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <span>音声</span>
-        </button>
-        <span class="stepnow" id="stepnow"></span>
-      </div>
+  <!-- 結果のまとめ：何袋に分けるかだけを出して、手順へ進む -->
+  <section class="screen" id="overview">
+    <p class="banner" id="banner"><b>サンプル表示中</b><span>レシートを撮ると、あなたの買い物に変わります</span></p>
+    <h2 class="ov-title" id="ovTitle"></h2>
+    <p class="ov-sub" id="ovSub"></p>
+    <ul class="ov-bags" id="ovBags"></ul>
+    <div class="leftover" id="leftSec" hidden>
+      <h2 class="label">入りきらなかった物</h2>
+      <div class="chips" id="leftList"></div>
+      <p class="leftnote" id="leftNote"></p>
     </div>
-    <div>
-      <!-- 袋の数・種類を決めたとき、入りきらなかった物 -->
-      <div class="leftover" id="leftSec" hidden>
-        <h2 class="label">入りきらなかった物</h2>
-        <div class="chips" id="leftList"></div>
-        <p class="leftnote" id="leftNote"></p>
-      </div>
-      <h2 class="label" style="margin-bottom:4px">詰める順番</h2>
-      <p class="steps-lead">かごの上の方（レシートの下の方）にある商品から、なるべく順に取り出せる並びにしています。</p>
-      <ol class="steps" id="steps"></ol>
+    <button type="button" class="btn big" id="startGuide">詰め始める</button>
+    <div class="ov-links">
+      <button type="button" class="pick" id="toItems">買った物を確認・直す</button>
+      <button type="button" class="pick" id="toSetup">袋を変える</button>
     </div>
-  </div>
+  </section>
 
-  <section>
+  <!-- 手順：1画面に1手順。画面をタップすると次へ進む -->
+  <section class="screen" id="guide">
+    <div class="g-top">
+      <button type="button" class="g-close" id="guideClose" aria-label="まとめに戻る">×</button>
+      <span class="g-count" id="stepnow"></span>
+      <button type="button" class="ctl voice" id="voiceBtn" aria-pressed="true" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>音声</span>
+      </button>
+    </div>
+    <div class="g-bar" aria-hidden="true"><span id="guideBar"></span></div>
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
+    </div>
+    <div class="now" id="nowCard" aria-live="polite"></div>
+    <div class="g-foot">
+      <button type="button" class="pick" id="prevBtn">◀ 前へ</button>
+      <span class="g-tap">画面をタップで次へ</span>
+    </div>
+  </section>
+
+  <!-- 詰め終わり -->
+  <section class="screen" id="done">
+    <svg class="done-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="var(--accent)"/><path d="M14 24.5l7 7 13-14" fill="none" stroke="var(--accent-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>詰め終わりました</h2>
+    <p class="done-text" id="doneText"></p>
+    <button type="button" class="btn big" id="doneBack">まとめに戻る</button>
+    <button type="button" class="pick" id="doneAgain">もう一度、最初から見る</button>
+  </section>
+
+  <!-- 買った物の確認・修正（まとめから開く） -->
+  <section class="screen" id="itemsScreen">
+    <button type="button" class="pick back" id="itemsBack">◀ まとめに戻る</button>
     <h2>買った物</h2>
     <p class="lead">数字を直すと、すぐに詰め直します。「推測」の付いた商品は、レシートから特定しきれなかった物です。</p>
     <div class="tablewrap">
@@ -423,14 +498,12 @@ footer{font-size:12px;color:var(--muted)}
         <tbody id="itemRows"></tbody>
       </table>
     </div>
+    <div id="warnSec">
+      <h2>気をつけること</h2>
+      <ul class="warns" id="warnList"></ul>
+    </div>
+    <footer>商品のサイズと重さはAIによる目安です。袋の耐荷重は一般的な目安（レジ袋 小3kg・中5kg・大8kg など）で計算しています。</footer>
   </section>
-
-  <section id="warnSec">
-    <h2>気をつけること</h2>
-    <ul class="warns" id="warnList"></ul>
-  </section>
-
-  <footer>商品のサイズと重さはAIによる目安です。袋の耐荷重は一般的な目安（レジ袋 小3kg・中5kg・大8kg など）で計算しています。</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -831,12 +904,41 @@ function normalize(raw){
            warnings:(Array.isArray(r.w) ? r.w : []).map(String).filter(Boolean).slice(0, 6) };
 }
 
+// 画像つきで問い合わせ、JSONの返答をそのまま返す（claude.ai なら sample、外ならサーバー経由）
+async function ask(prompt, images, signal, onText){
+  if(sample) return sample.json(prompt, { images, signal, onText });
+  const imgs = await Promise.all(images.map(async b => ({ type: b.type || "image/jpeg", data: await toBase64(b) })));
+  return postAnalyze(JSON.stringify({ prompt, images: imgs }), signal);
+}
+
 // images: Blob[]（レシート → 袋・箱の順）
 async function analyze({ images, nReceipts, hasBox, signal, onText }){
-  const prompt = buildPrompt(nReceipts, hasBox);
-  if(sample) return normalize(await sample.json(prompt, { images, signal, onText }));
-  const imgs = await Promise.all(images.map(async b => ({ type: b.type || "image/jpeg", data: await toBase64(b) })));
-  return normalize(await postAnalyze(JSON.stringify({ prompt, images: imgs }), signal));
+  return normalize(await ask(buildPrompt(nReceipts, hasBox), images, signal, onText));
+}
+
+// マイバッグ登録用：袋・箱1つの写真から、内寸と耐荷重の目安を推定する
+const BAG_PROMPT = `画像は買い物に使う袋（エコバッグ・レジ袋など）か箱（段ボールなど）1つ。
+内寸を推定する。物差しは写っている物を使う（レシートの幅58/80mm、A4用紙21×29.7cm、500mlペットボトルの高さ約21cm、手のひら、段ボールのサイズ表記・印字など）。
+袋は 幅=口の横幅、奥行=まち、高さ=底から持ち手の付け根まで。まちが見えなければ幅の半分程度。
+JSONのみで返答：
+{"n":"名前(例 青いエコバッグ。15字以内)","k":"g(袋)かb(箱)","s":[幅cm,奥行cm,高さcm],"kg":耐荷重の目安kg,"r":"物差しにした物(20字以内。無ければ\\"見た目\\")","c":物差しがあれば1、無ければ0}
+袋も箱も写っていなければ "s":null とし、r に理由。`;
+
+// 戻り値: { name, kind:"bag"|"box", W, D, H, kg, ruler, confident }。袋・箱が写っていなければ { none:true, reason }
+async function measureBag({ image, signal }){
+  const r = await ask(BAG_PROMPT, [image], signal);
+  const s = Array.isArray(r?.s) ? r.s.map(Number) : null;
+  if(!s || !(s[0] > 0 && s[1] > 0 && s[2] > 0)) return { none: true, reason: String(r?.r ?? "") };
+  const box = r.k === "b";
+  return {
+    name: String(r.n ?? "").slice(0, 20),
+    kind: box ? "box" : "bag",
+    // 範囲はマイバッグの入力欄と同じ
+    W: Math.round(num(s[0], 5, 150, 38)), D: Math.round(num(s[1], 3, 150, 20)), H: Math.round(num(s[2], 5, 150, 32)),
+    kg: Math.round(num(r.kg, 1, 50, box ? 15 : 10)),
+    ruler: String(r.r ?? "").slice(0, 30),
+    confident: Number(r.c) !== 0
+  };
 }
 
 const ERR = {
@@ -852,7 +954,7 @@ const ERR = {
 };
 const errorMessage = code => ERR[code] || "解析に失敗しました。通信状況を確認して、もう一度押してください。";
 
-App.ai = { init, analyze, errorMessage };
+App.ai = { init, analyze, measureBag, errorMessage };
 })(window.App = window.App || {});
 </script>
 <script>
@@ -1215,14 +1317,15 @@ function toPacked(X, bagStates, sol){
     C: b.C, slack: b.slack, kg: b.kg, top: b.top, n: b.list.length,
     group: b.list.length && b.list.every(p => p.u.chem) ? "chem" : "food"
   }));
-  const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.p.u.i - b.p.u.i);
-  // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）
-  const stepOf = new Map(); let step = -1, prev = null;
-  for(const { p } of recs){ if(p.u.rank !== prev){ step++; prev = p.u.rank; } stepOf.set(p.u.i, step); }
+  // 1袋ずつ詰め終えてから次の袋へ進む順番にする（画面では今の袋だけを大きく映すため）。袋の中は入れる順のまま
+  const recs = shown.flatMap((b, bi) => b.list.map(p => ({ p, b, bi }))).sort((a, b) => a.bi - b.bi || a.p.u.i - b.p.u.i);
+  // 手順は袋に入った商品だけで作り直す（余りを抜くと、同じ段階が続く所が変わるため）。袋が変わるところでも区切る
+  const stepOf = new Map(); let step = -1, prev = null, prevBag = -1;
+  for(const { p, bi } of recs){ if(p.u.rank !== prev || bi !== prevBag){ step++; prev = p.u.rank; prevBag = bi; } stepOf.set(p.u.i, step); }
   const labeled = new Set(), placed = [], units = [];
   for(const { p, b, bi } of recs){
     const { u, r } = p, C = b.C;
-    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i) });
+    units.push({ it: u.it, rank: u.rank, step: stepOf.get(u.i), bag: bi });
     // o: 置いた向き（orientations() の番号）。raw: その向きでの縮める前の寸法。3Dで向きと縮尺を合わせるのに使う
     // first: 同じ商品が複数あるとき、名前の札を1つだけ出すための目印
     const first = !labeled.has(u.it.id); labeled.add(u.it.id);
@@ -1264,10 +1367,10 @@ function improve(packed, onDone){
   return () => { stopped = true; };
 }
 
-// 入れる順番どおりの手順。同じ段階が続くところは1つの手順にまとめる
+// 入れる順番どおりの手順。同じ袋で同じ段階が続くところは1つの手順にまとめる。bag: その手順で詰める袋の番号
 function buildSteps(packed){
   const steps = [];
-  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = { rank:u.rank, ...STEP_TEXT[u.rank] };
+  for(const u of packed.units) if(!steps[u.step]) steps[u.step] = { rank:u.rank, bag:u.bag, ...STEP_TEXT[u.rank] };
   return steps;
 }
 
@@ -1591,7 +1694,8 @@ App.models = { build, get, cacheSize: () => cache.size };
 "use strict";
 const { reduceMotion } = App.util;
 
-let renderer, scene, camera, root, stage, meshes = [], packed = null, curStep = 0;
+let renderer, scene, camera, root, stage, meshes = [], packed = null, curStep = 0, curBag = 0;
+let bagViews = [];   // 袋ごとの { x:中心, W, D, top:描いた物の一番上 }。今の袋だけを映すのに使う
 const view = { rotY:-0.7, tilt:0.55, dist:120, base:120, target:null };
 const ready = typeof THREE !== "undefined";
 
@@ -1656,6 +1760,23 @@ function resize(){
   const r = stage.getBoundingClientRect();
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+  fitView();
+}
+// 今の袋が画面いっぱいに収まる距離にカメラを置く（縦は袋の高さ、横は袋の対角線で合わせる）
+function fitView(){
+  const b = bagViews[curBag];
+  if(!b) return;
+  const t = Math.tan(camera.fov * Math.PI / 360);
+  view.target = new THREE.Vector3(b.x, b.top * 0.4, 0);
+  view.base = 1.08 * Math.max(b.top * 0.6, Math.hypot(b.W, b.D) * 0.55 / Math.max(0.3, camera.aspect)) / t;
+  view.dist = view.base;
+}
+// i番目の袋だけを表示する
+function focusBag(i){
+  if(!ready || !bagViews.length) return;
+  curBag = Math.max(0, Math.min(bagViews.length - 1, i));
+  root.children.forEach((g, k) => { g.visible = k === curBag; });
+  fitView();
 }
 // 後片付け。保存してあるモデルの形データ（keep）と札の画像（keep）は、使い回すので捨てない
 function disposeAll(){
@@ -1754,7 +1875,7 @@ function makeLabel(text, worldH){
   return sp;
 }
 function drawLabel(text){
-  const fs = 44, pad = 14, c = document.createElement("canvas"), g = c.getContext("2d");
+  const fs = 56, pad = 16, c = document.createElement("canvas"), g = c.getContext("2d");
   const font = `700 ${fs}px "Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif`;
   g.font = font;
   const tw = Math.ceil(g.measureText(text).width);
@@ -1779,17 +1900,19 @@ function show(packedResult, steps){
   const Cs = bags.length ? bags.map(b => b.C || C) : [C];
   const maxW = Math.max(...Cs.map(c => c.W)), gap = maxW * 0.35;
   const span = Cs.reduce((s, c) => s + c.W, 0) + (Cs.length - 1) * gap;
-  let topY = C.H, x = -span / 2;
-  for(const Cb of Cs){
+  let x = -span / 2;
+  bagViews = Cs.map(Cb => {
     const g = new THREE.Group(); g.position.x = x + Cb.W / 2; x += Cb.W + gap; root.add(g);
-    topY = Math.max(topY, Cb.kind === "box" ? addBox(g, Cb) : addBag(g, Cb));
-  }
-  const labelH = Math.max(2.2, maxW * 0.085);
+    const top = Cb.kind === "box" ? addBox(g, Cb) : addBag(g, Cb);
+    return { x: g.position.x, W: Cb.W, D: Cb.D, top };
+  });
   placed.forEach(p => {
     const { holder, mats } = itemObject(p);
     root.children[p.bag].add(holder);
     let label = null;
     if(p.first){
+      // 袋1つを画面いっぱいに映すので、札は袋の幅の1割強の大きさにする
+      const labelH = Math.max(2.4, (Cs[p.bag] || C).W * 0.12);
       label = makeLabel(p.name, labelH);
       label.position.set(0, p.h / 2 + labelH * 0.8, 0);
       label.visible = false;
@@ -1797,16 +1920,16 @@ function show(packedResult, steps){
     }
     meshes.push({ m:holder, mats, label, step: p.step, y:p.y, t0:0 });
   });
-  view.target = new THREE.Vector3(0, topY * 0.42, 0);
-  view.base = Math.max(span * 1.25, topY * 2.2) + 15;
-  view.dist = view.base;
+  curBag = 0;
   resize();
+  focusBag(0);
 }
 
-// k番目の手順までを表示。animate なら k番目の商品を上から落とす
-function setStep(k, animate){
+// k番目の手順までを表示。animate なら k番目の商品を上から落とす。bag: その手順の袋（その袋だけを映す）
+function setStep(k, animate, bag){
   curStep = k;
   if(!ready) return;
+  if(bag != null && bag !== curBag) focusBag(bag);
   const now = performance.now(), drop = packed ? packed.C.H : 30;
   for(const o of meshes){
     o.m.visible = o.step <= k;
@@ -1840,7 +1963,7 @@ function loop(now){
   renderer.render(scene, camera);
 }
 
-App.scene3d = { init, show, setStep };
+App.scene3d = { init, show, setStep, focusBag };
 })(window.App = window.App || {});
 </script>
 <script>
@@ -1906,12 +2029,12 @@ App.voice = { supported, speak, cancel, setEnabled, enabled: () => supported && 
 // 画面の操作と表示（入力欄、袋の選択、結果の一覧・手順・統計）
 (function(App){
 "use strict";
-const { $, el, fmt, reduceMotion } = App.util;
+const { $, el, fmt } = App.util;
 const { PRESETS, DEFAULT_CONTAINER, nameOf, KINDS } = App.config;
 
 // fixed: 袋の数・種類を決めたときの袋・箱のidの並び（おまかせなら null）
 const state = { receipts:[], boxPhoto:[], containerId:DEFAULT_CONTAINER, fixed:null, photoContainer:null, data:App.SAMPLE, isSample:true, step:0 };
-let aiReady = false, aiChecking = true, imgLimits = null, ctl = null, steps = [], playTimer = null, lastPacked = null;
+let aiReady = false, aiChecking = true, imgLimits = null, ctl = null, steps = [], lastPacked = null;
 // マイバッグ（bag-store.js に保存した袋・箱）を、袋詰めの計算で使う形にする
 const fromMyBag = b => ({ id:b.id, group:"マイバッグ", label:b.name, kind:b.kind, W:b.W, D:b.D, H:b.H, kg:b.kg });
 const myBags = () => App.bagStore.bags().map(fromMyBag);
@@ -2058,10 +2181,47 @@ function openBagForm(base, anchor){
   $("bfKg").value = String(base?.kg ?? 10);
   setBfKind(base?.kind === "box" ? "box" : "bag");
   $("bfMsg").textContent = ""; $("bfMsg").classList.remove("err");
+  $("bfPhotoThumb").textContent = "";
   $("bagForm").hidden = false;
   $("bfName").focus();
 }
-function closeBagForm(){ $("bagForm").hidden = true; }
+function closeBagForm(){ bfCtl?.abort(); $("bagForm").hidden = true; }
+
+// 袋・箱の写真から大きさを推定して、入力欄に入れる（保存は人が確かめてから）
+let bfCtl = null;
+async function measureFromPhoto(file){
+  const msg = $("bfMsg"), btn = $("bfPhotoBtn");
+  const say = (text, err) => { msg.textContent = text; msg.classList.toggle("err", !!err); };
+  if(!file?.type.startsWith("image/")) return;
+  if(!aiReady || !imgLimits) return say(aiChecking ? "Claudeに接続しています。少し待ってから撮ってください。" : "この画面ではAIに接続できないため、写真から測れません。数字を直接入れてください。", true);
+  bfCtl?.abort();
+  const ac = bfCtl = new AbortController();
+  btn.classList.add("busy"); $("bfSave").disabled = true;
+  try{
+    say("写真を軽くしています…");
+    const p = await App.imagePrep.prepImage(file, "box");
+    const t = $("bfPhotoThumb"); t.textContent = "";
+    const d = el("div", "thumb"), img = document.createElement("img");
+    img.src = URL.createObjectURL(p.blob); img.alt = "測った袋・箱"; img.onload = () => URL.revokeObjectURL(img.src);
+    d.append(img); t.append(d);
+    say("写真から大きさを測っています…");
+    const r = await App.ai.measureBag({ image: p.blob, signal: ac.signal });
+    if(ac.signal.aborted) return;
+    if(r.none) return say(`袋や箱が見つかりませんでした${r.reason ? "（" + r.reason + "）" : ""}。撮り直すか、数字を直接入れてください。`, true);
+    $("bfW").value = String(r.W); $("bfD").value = String(r.D); $("bfH").value = String(r.H); $("bfKg").value = String(r.kg);
+    setBfKind(r.kind);
+    if(!$("bfName").value.trim() && r.name) $("bfName").value = r.name;
+    say(r.confident
+      ? `${r.ruler || "写っている物"}を物差しに測りました。違っていたら直してから保存してください。`
+      : "物差しになる物が見つからず、見た目から推定しました。目安なので、できれば測って直してください。");
+  }catch(e){
+    if(ac.signal.aborted || e?.code === "cancelled") return;
+    say(e?.message === "toBlob" || e instanceof DOMException ? "この写真は読み込めませんでした。別の写真を選んでください。" : App.ai.errorMessage(e?.code), true);
+  }finally{
+    if(bfCtl === ac) bfCtl = null;
+    btn.classList.remove("busy"); $("bfSave").disabled = false;
+  }
+}
 async function saveBagForm(){
   const name = $("bfName").value.trim();
   const v = id => Number($(id).value);
@@ -2090,10 +2250,11 @@ function wireBagForm(){
   $("bfKind").addEventListener("click", e => { const b = e.target.closest("button"); if(b) setBfKind(b.dataset.v); });
   $("bfSave").onclick = saveBagForm;
   $("bfCancel").onclick = closeBagForm;
+  $("bfPhoto").addEventListener("change", e => { measureFromPhoto(e.target.files[0]); e.target.value = ""; });
   $("bpToggle").onclick = () => setIntroList($("introBagList").hidden);
   // フォームの中で Enter を押しても、外側の「詰め方を考える」が動かないようにする
   $("bagForm").addEventListener("keydown", e => {
-    if(e.key === "Enter" && e.target.tagName === "INPUT"){ e.preventDefault(); saveBagForm(); }
+    if(e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "file"){ e.preventDefault(); saveBagForm(); }
     if(e.key === "Escape"){ e.preventDefault(); closeBagForm(); }
   });
 }
@@ -2170,9 +2331,8 @@ async function onSubmit(e){
       state.data = data; state.isSample = false;
       if(data.container){ state.photoContainer = data.container; state.containerId = "photo"; }
       renderAll();
-      setScreen("result");
-      setStatus("できました。下の3Dで順番を確認してください");
-      requestAnimationFrame(() => $("summary").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" }));
+      setScreen("overview"); window.scrollTo({ top:0 });
+      setStatus("できました");
     }
   }catch(err){
     if(err?.code === "cancelled") setStatus("止めました");
@@ -2182,42 +2342,64 @@ async function onSubmit(e){
   }
 }
 
-// ---------- 手順の再生 ----------
+// ---------- 手順（1画面に1手順。タップで次へ） ----------
 function setStep(k, animate){
   const n = steps.length;
   state.step = Math.max(0, Math.min(n - 1, k));
-  App.scene3d.setStep(state.step, animate);
-  document.querySelectorAll(".stepbtn").forEach((b, i) => b.setAttribute("aria-current", i === state.step ? "step" : "false"));
-  $("stepnow").textContent = n ? `手順 ${state.step + 1} / ${n}` : "";
+  // 3Dには、その手順で詰める袋だけを映す
+  App.scene3d.setStep(state.step, animate, steps[state.step]?.bag ?? 0);
+  renderNow(state.step);
+  $("stepnow").textContent = n ? `${state.step + 1} / ${n}` : "";
+  $("guideBar").style.width = n ? `${(state.step + 1) / n * 100}%` : "0";
+  $("prevBtn").disabled = state.step === 0;
 }
-// 再生：音声がオンなら、各手順を読み終わってから次へ進む（3Dの動きと声をそろえる）。オフなら1.6秒ごとに進む
-let playToken = 0, playing = false;
-const wait = ms => new Promise(r => { playTimer = setTimeout(r, ms); });
-function stopPlay(){
-  playToken++; playing = false;
-  clearTimeout(playTimer); playTimer = null;
-  App.voice.cancel();
-  $("playBtn").textContent = "最初から再生";
+const unitOf = P => P.bags.length && P.bags.every(b => b.C.kind === "box") ? "箱" : "袋";
+
+// 袋の中の置き場所を言葉にする（例「左奥の底」「まん中の上」）。3Dは左手前から見ているので、z がマイナスの側が奥
+function whereOf(p, C){
+  const lr = p.x < -C.W * 0.17 ? "左" : p.x > C.W * 0.17 ? "右" : "";
+  const fb = p.z < -C.D * 0.17 ? "奥" : p.z > C.D * 0.17 ? "手前" : "";
+  const lv = p.y - p.h / 2 < 1 ? "底" : "上";
+  return `${lr + fb || "まん中"}の${lv}`;
 }
-async function play(){
-  const my = ++playToken; playing = true;
-  $("playBtn").textContent = "一時停止";
-  for(let k = 0; k < steps.length; k++){
-    if(my !== playToken) return;
-    setStep(k, true);
-    // 最初の読み上げはボタンを押した流れの中で始まる（iPhoneは、押した直後でないと声を出させてくれない）
-    if(App.voice.enabled()){ await App.voice.speak(stepSpeech(k)); await wait(350); }
-    else await wait(1600);
+// 3Dの下に出す「いま入れる物」。商品名を大きく、置き場所を下に添える
+function renderNow(k){
+  const box = $("nowCard"); box.textContent = "";
+  const s = steps[k], P = lastPacked;
+  if(!s || !P) return;
+  box.append(el("p", "now-title", (P.bags.length > 1 ? `${s.bag + 1}${unitOf(P)}目　` : "") + s.title));
+  const list = el("ul", "now-items"), seen = new Map();
+  P.placed.filter(p => p.step === k).forEach(p => { const e = seen.get(p.name); if(e) e.n++; else seen.set(p.name, { p, n: 1 }); });
+  for(const { p, n } of seen.values()){
+    const li = el("li"), sw = el("span", "sw"); sw.style.background = p.color;
+    const txt = el("span", "now-txt");
+    txt.append(el("b", null, p.name + (n > 1 ? ` ×${n}` : "")), el("span", "now-where", whereOf(p, P.bags[p.bag]?.C || P.C) + "へ"));
+    li.append(sw, txt); list.append(li);
   }
-  if(my !== playToken) return;
-  if(App.voice.enabled()) await App.voice.speak(finishSpeech());
-  if(my === playToken){ playing = false; $("playBtn").textContent = "最初から再生"; }
+  box.append(list);
 }
-// 手順を1つ選んだとき（一覧・◀▶）。音声がオンならその手順を読み上げる
+// 手順を表示する。音声がオンならその手順を読み上げる（タップした流れの中で始まるので、iPhoneでも声が出る）
 function goStep(k, animate){
-  stopPlay();
+  App.voice.cancel();
   setStep(k, animate);
   if(App.voice.enabled()) App.voice.speak(stepSpeech(state.step));
+}
+function startGuide(){
+  setScreen("guide"); window.scrollTo({ top:0 });
+  goStep(0, true);
+}
+// 次の手順へ。最後の手順の次は「詰め終わりました」の画面
+function nextStep(){
+  if(state.step < steps.length - 1){ goStep(state.step + 1, true); return; }
+  App.voice.cancel();
+  $("doneText").textContent = doneText();
+  setScreen("done"); window.scrollTo({ top:0 });
+  if(App.voice.enabled()) App.voice.speak(finishSpeech());
+}
+function doneText(){
+  const P = lastPacked; if(!P) return "";
+  const unit = unitOf(P), n = P.bags.length, left = P.leftover.length;
+  return left ? `${n}つの${unit}に詰めました。入りきらない物が${left}点あります。` : `${n}つの${unit}に、全部詰めました。`;
 }
 
 // 読み上げる文。「手順2。箱やパックで面をそろえる。冷凍餃子、鶏むね肉 パックを入れます。」
@@ -2251,13 +2433,26 @@ function syncVoiceBtn(){
   b.setAttribute("aria-label", App.voice.enabled() ? "音声の案内をオフにする" : "音声の案内をオンにする");
 }
 function wirePlayback(){
-  $("playBtn").onclick = () => { if(playing){ stopPlay(); return; } play(); };
+  $("startGuide").onclick = startGuide;
   $("prevBtn").onclick = () => goStep(state.step - 1, false);
-  $("nextBtn").onclick = () => goStep(state.step + 1, true);
+  $("guideClose").onclick = () => { App.voice.cancel(); setScreen("overview"); };
+  $("doneBack").onclick = () => setScreen("overview");
+  $("doneAgain").onclick = startGuide;
+  $("toItems").onclick = () => { setScreen("items"); window.scrollTo({ top:0 }); };
+  $("itemsBack").onclick = () => { setScreen("overview"); window.scrollTo({ top:0 }); };
+  $("toSetup").onclick = () => { setScreen("setup"); window.scrollTo({ top:0 }); };
+  // 手順の画面は、どこをタップしても次へ進む（ボタンは除く。3Dを回すために指を動かしたときも進まない）
+  let down = null;
+  $("guide").addEventListener("pointerdown", e => { down = { x:e.clientX, y:e.clientY, t:performance.now() }; });
+  $("guide").addEventListener("pointerup", e => {
+    const d = down; down = null;
+    if(!d || e.target.closest("button")) return;
+    if(Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10 && performance.now() - d.t < 600) nextStep();
+  });
   $("voiceBtn").onclick = () => {
     App.voice.setEnabled(!App.voice.enabled());
     syncVoiceBtn();
-    if(App.voice.enabled() && !playing) App.voice.speak("音声で案内します。");
+    if(App.voice.enabled()) App.voice.speak(stepSpeech(state.step));
   };
   syncVoiceBtn();
 }
@@ -2316,16 +2511,17 @@ function renderTable(){
   });
 }
 
-// 詰め直す。まず手早く詰めた結果を出し、後ろで焼きなましをして、良い詰め方が見つかったら差し替える（再生中は差し替えない）
+// 詰め直す。まず手早く詰めた結果を出し、後ろで焼きなましをして、良い詰め方が見つかったら差し替える（手順を見ている間は差し替えない）
 let stopImprove = () => {};
+const inGuide = () => $("app").classList.contains("guide");
 function renderPack(){
-  stopPlay(); stopImprove();
+  App.voice.cancel(); stopImprove();
   const C = container(), F = fixedBags(), items = state.data.items.filter(it => it.qty > 0);
   const packed = App.packing.pack(items, C, F ? { bags: F } : {});
   showPacked(packed, items, C, true);
   stopImprove = App.packing.improve(packed, better => {
     stopImprove = () => {};
-    if(better && !playing) showPacked(better, items, C, false);
+    if(better && !inGuide()) showPacked(better, items, C, false);
     else $("searchTag")?.remove();
   });
 }
@@ -2337,35 +2533,24 @@ function showPacked(packed, items, C, searching){
   steps = App.packing.buildSteps(packed);
 
   $("banner").hidden = !state.isSample;
-  $("store").textContent = d.store;
-  $("summary").textContent = d.summary;
 
-  // 統計（袋の数・種類を決めたときは、袋ごとに大きさが違うことがある。b.C がその袋の大きさ）
+  // まとめの画面：何袋に分けるかと、袋ごとの重さだけ（袋の数・種類を決めたときは、袋ごとに大きさが違うことがある。b.C がその袋の大きさ）
   const left = packed.leftover;
   const totalKg = [...packed.units, ...left].reduce((a, u) => a + u.it.kg, 0);
-  const maxBag = packed.bags.reduce((a, b) => Math.max(a, b.kg), 0);
   const overAny = packed.bags.some(b => b.kg > b.C.kg + 1e-6);
   const unit = packed.bags.every(b => b.C.kind === "box") && C.kind === "box" ? "箱" : "袋";
-  const st = $("stats"); st.textContent = "";
-  const stat = (k, v, u, bad) => { const s = el("div", "stat"); const vv = el("span", "v" + (bad ? " bad" : ""), v); if(u) vv.append(el("small", null, u)); s.append(vv, el("span", "k", k)); st.append(s); };
-  stat("商品", String(packed.units.length + left.length), "点");
-  stat("合計の重さ", fmt(totalKg), "kg");
-  stat(packed.fixed ? "使う袋" : nameOf(C), String(packed.bags.length), unit);
-  stat("いちばん重い" + unit, fmt(maxBag), "kg", overAny);
-  if(packed.fixed) stat("入りきらない", String(left.length), "点", left.length > 0);
-
-  // 3Dの上に出す袋ごとの札
-  const bt = $("bagtags"); bt.textContent = "";
+  $("ovTitle").textContent = `${packed.fixed ? "" : nameOf(C) + " "}${packed.bags.length}${unit}に分けます`;
+  $("ovSub").textContent = `${packed.units.length + left.length}点・合計${fmt(totalKg)}kg`;
+  if(searching){ const s = el("span", "ov-search", "（もっと良い詰め方を計算中…）"); s.id = "searchTag"; $("ovSub").append(s); }
+  const ob = $("ovBags"); ob.textContent = "";
   packed.bags.forEach((b, i) => {
-    const pct = Math.round(b.top / b.C.H * 100);
     // 袋は持ち手を結ぶ分（b.slack cm）までならはみ出してよい
-    const over = b.top > b.C.H + b.slack + 0.5 || b.kg > b.C.kg;
-    const name = packed.fixed ? `${i + 1}. ${nameOf(b.C)}` : `${i + 1}${unit}目`;
-    bt.append(el("span", "bagtag" + (over ? " over" : ""), `${name} ${fmt(b.kg)}kg・高さ${pct}%${b.group === "chem" ? "・日用品" : ""}`));
+    const heavy = b.kg > b.C.kg, full = b.top > b.C.H + b.slack + 0.5;
+    const li = el("li", heavy || full ? "over" : "");
+    li.append(el("b", null, packed.fixed ? `${i + 1}. ${nameOf(b.C)}` : `${i + 1}${unit}目`),
+              el("span", null, `${b.n}点・${fmt(b.kg)}kg${heavy ? "・重すぎ" : full ? "・あふれる" : ""}`));
+    ob.append(li);
   });
-  if(left.length) bt.append(el("span", "bagtag over", `入りきらない ${left.length}点`));
-  if(packed.bags.some(b => b.C.kind === "bag")) bt.append(el("span", "bagtag note", "点線より上は持ち手を結ぶ分"));
-  if(searching){ const s = el("span", "bagtag note", packed.fixed ? "もっと入る詰め方を探しています…" : "もっと良い詰め方を探しています…"); s.id = "searchTag"; bt.append(s); }
 
   // 入りきらなかった物（袋の数・種類を決めたとき）
   $("leftSec").hidden = !left.length;
@@ -2378,24 +2563,6 @@ function showPacked(packed, items, C, searching){
   const leftKg = left.reduce((a, u) => a + u.it.kg, 0);
   $("leftNote").textContent = left.length ? `${left.length}点・${fmt(leftKg)}kg が入りません。袋を1つ足すか、大きい袋に変えてください。` : "";
 
-  // 手順
-  const ol = $("steps"); ol.textContent = "";
-  steps.forEach((s, k) => {
-    const li = el("li"); const b = el("button", "stepbtn"); b.type = "button";
-    const body = el("div");
-    body.append(el("h3", null, s.title), el("p", null, s.detail));
-    const chips = el("div", "chips"); const seen = new Set();
-    packed.units.filter(u => u.step === k).forEach(u => {
-      if(seen.has(u.it.id)) return; seen.add(u.it.id);
-      const c = el("span", "chip"); const sw = el("span", "sw"); sw.style.background = packed.colorOf.get(u.it.id);
-      c.append(sw, u.it.name + (u.it.qty > 1 ? " ×" + u.it.qty : "")); chips.append(c);
-    });
-    body.append(chips);
-    b.append(el("span", "n", String(k + 1)), body);
-    b.onclick = () => goStep(k, true);
-    li.append(b); ol.append(li);
-  });
-
   // 注意
   const warns = [...d.warnings];
   if(items.some(i => i.temp !== "room")) warns.push("冷凍・冷蔵品は同じ袋の中で隣どうしに入れると、冷たさが長持ちします。");
@@ -2407,15 +2574,16 @@ function showPacked(packed, items, C, searching){
   warns.forEach(w => wl.append(el("li", null, w)));
 
   App.scene3d.show(packed, steps);
-  setStep(steps.length - 1, false);
+  setStep(0, false);
 }
 
 function renderAll(){ renderContainerSeg(); renderTable(); renderPack(); }
 
-// 画面の段階：「intro」（大きなボタンだけ）→「setup」（レシートの確認と袋・箱の選択）→「result」（結果）
+// 画面：「intro」（大きなボタンだけ）→「setup」（レシートの確認と袋・箱の選択）→「overview」（まとめ）
+//      →「guide」（1手順ずつ）→「done」（詰め終わり）。「items」は買った物の確認・修正
+const SCREENS = ["intro", "setup", "overview", "guide", "done", "items"];
 function setScreen(name){
-  $("app").classList.toggle("intro", name === "intro");
-  $("app").classList.toggle("setup", name === "setup");
+  for(const s of SCREENS) $("app").classList.toggle(s, s === name);
 }
 
 async function start(){
@@ -2425,16 +2593,13 @@ async function start(){
     .finally(() => { aiChecking = false; syncGo(); });
   try { App.scene3d.init($("cv"), $("stage")); } catch(e) { console.error(e); }
   wirePhotos($("receiptInput"), $("dzReceipt"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1));
-  // 上の大きな「レシートを撮る」ボタンと「写真から選ぶ」。撮ったら最初の画面を抜けて、写真と「詰め方を考える」が見える位置へ
-  // 結果の画面にいるとき（撮り直し・追加）は、画面は切り替えずに入力欄まで動かすだけ
-  const toIntake = () => {
-    if($("app").classList.contains("intro")){ setScreen("setup"); window.scrollTo({ top:0 }); return; }
-    $("intake").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block:"start" });
-  };
+  // 最初の画面の大きな「レシートを撮る」ボタンと「写真から選ぶ」。撮ったら、写真と「詰め方を考える」の画面へ
+  const toIntake = () => { setScreen("setup"); window.scrollTo({ top:0 }); };
   wirePhotos($("receiptCamera"), $("heroCam"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
   wirePhotos($("receiptPick"), $("heroPick"), "receipts", "receiptThumbs", () => Math.max(1, maxTotal() - 1), toIntake);
-  const toSample = () => { setScreen("result"); window.scrollTo({ top:0 }); };
+  const toSample = () => { setScreen("overview"); window.scrollTo({ top:0 }); };
   $("skipIntro").onclick = toSample;
+  $("homeBtn").onclick = () => { setScreen("intro"); window.scrollTo({ top:0 }); };
   $("showSample").onclick = toSample;
   wirePhotos($("boxInput"), $("dzBox"), "boxPhoto", "boxThumbs", () => 1);
   $("intake").addEventListener("submit", onSubmit);

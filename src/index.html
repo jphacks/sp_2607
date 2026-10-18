@@ -12,7 +12,7 @@
 </head>
 <body>
 
-<!-- 画面は3段階：intro（「レシートを撮る」だけ）→ setup（レシートの確認と袋・箱の選択）→ クラスなし（結果） -->
+<!-- 画面：intro（「レシートを撮る」だけ）→ setup（レシートの確認と袋・箱の選択）→ overview（まとめ）→ guide（1手順ずつ）→ done。items は買った物の確認 -->
 <div class="wrap intro" id="app">
   <!-- 画面の上に固定。押すと最初の画面に戻る（最初の画面では大きな見出しがあるので出さない） -->
   <button type="button" class="topbar" id="homeBtn" aria-label="最初の画面に戻る">
@@ -86,6 +86,16 @@
             <label for="bfName">名前</label>
             <input type="text" id="bfName" maxlength="20" placeholder="例：いつものエコバッグ">
           </div>
+          <!-- 袋・箱を撮ると、AIが大きさを推定して下の欄に入れる -->
+          <label class="bf-photo" id="bfPhotoBtn">
+            <input type="file" id="bfPhoto" accept="image/*">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5h3.6l2-3h5.8l2 3h3.6v12h-17z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.9" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>
+            <span class="bf-photo-text">
+              <b>写真から大きさを測る</b>
+              <small>レシートやA4の紙を横に置いて撮ると正確になります</small>
+            </span>
+          </label>
+          <div class="thumbs" id="bfPhotoThumb"></div>
           <div class="seg" id="bfKind" role="group" aria-label="袋か箱か">
             <button type="button" data-v="bag" aria-pressed="true">袋</button>
             <button type="button" data-v="box" aria-pressed="false">箱</button>
@@ -118,46 +128,57 @@
     </div>
   </form>
 
-  <div class="banner" id="banner"><b>表示中：サンプル</b><span>スーパーで12点買った例です。レシートを送ると、あなたの買い物に置き換わります。</span></div>
-
-  <div class="head">
-    <span class="store" id="store"></span>
-    <p class="summary" id="summary"></p>
-    <div class="stats" id="stats"></div>
-  </div>
-
-  <div class="main">
-    <div class="viewer">
-      <div class="stage" id="stage">
-        <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
-        <div class="bagtags" id="bagtags"></div>
-        <div class="hint"><span class="mouse">ドラッグで回転・ホイールで拡大</span><span class="touch">横になぞって回転・2本指で拡大</span></div>
-      </div>
-      <div class="controls">
-        <button type="button" class="ctl" id="prevBtn" aria-label="前の手順">◀</button>
-        <button type="button" class="ctl play" id="playBtn">最初から再生</button>
-        <button type="button" class="ctl" id="nextBtn" aria-label="次の手順">▶</button>
-        <button type="button" class="ctl voice" id="voiceBtn" aria-pressed="true" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <span>音声</span>
-        </button>
-        <span class="stepnow" id="stepnow"></span>
-      </div>
+  <!-- 結果のまとめ：何袋に分けるかだけを出して、手順へ進む -->
+  <section class="screen" id="overview">
+    <p class="banner" id="banner"><b>サンプル表示中</b><span>レシートを撮ると、あなたの買い物に変わります</span></p>
+    <h2 class="ov-title" id="ovTitle"></h2>
+    <p class="ov-sub" id="ovSub"></p>
+    <ul class="ov-bags" id="ovBags"></ul>
+    <div class="leftover" id="leftSec" hidden>
+      <h2 class="label">入りきらなかった物</h2>
+      <div class="chips" id="leftList"></div>
+      <p class="leftnote" id="leftNote"></p>
     </div>
-    <div>
-      <!-- 袋の数・種類を決めたとき、入りきらなかった物 -->
-      <div class="leftover" id="leftSec" hidden>
-        <h2 class="label">入りきらなかった物</h2>
-        <div class="chips" id="leftList"></div>
-        <p class="leftnote" id="leftNote"></p>
-      </div>
-      <h2 class="label" style="margin-bottom:4px">詰める順番</h2>
-      <p class="steps-lead">かごの上の方（レシートの下の方）にある商品から、なるべく順に取り出せる並びにしています。</p>
-      <ol class="steps" id="steps"></ol>
+    <button type="button" class="btn big" id="startGuide">詰め始める</button>
+    <div class="ov-links">
+      <button type="button" class="pick" id="toItems">買った物を確認・直す</button>
+      <button type="button" class="pick" id="toSetup">袋を変える</button>
     </div>
-  </div>
+  </section>
 
-  <section>
+  <!-- 手順：1画面に1手順。画面をタップすると次へ進む -->
+  <section class="screen" id="guide">
+    <div class="g-top">
+      <button type="button" class="g-close" id="guideClose" aria-label="まとめに戻る">×</button>
+      <span class="g-count" id="stepnow"></span>
+      <button type="button" class="ctl voice" id="voiceBtn" aria-pressed="true" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>音声</span>
+      </button>
+    </div>
+    <div class="g-bar" aria-hidden="true"><span id="guideBar"></span></div>
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="袋に詰めた状態の3D表示"></canvas>
+    </div>
+    <div class="now" id="nowCard" aria-live="polite"></div>
+    <div class="g-foot">
+      <button type="button" class="pick" id="prevBtn">◀ 前へ</button>
+      <span class="g-tap">画面をタップで次へ</span>
+    </div>
+  </section>
+
+  <!-- 詰め終わり -->
+  <section class="screen" id="done">
+    <svg class="done-mark" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="var(--accent)"/><path d="M14 24.5l7 7 13-14" fill="none" stroke="var(--accent-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>詰め終わりました</h2>
+    <p class="done-text" id="doneText"></p>
+    <button type="button" class="btn big" id="doneBack">まとめに戻る</button>
+    <button type="button" class="pick" id="doneAgain">もう一度、最初から見る</button>
+  </section>
+
+  <!-- 買った物の確認・修正（まとめから開く） -->
+  <section class="screen" id="itemsScreen">
+    <button type="button" class="pick back" id="itemsBack">◀ まとめに戻る</button>
     <h2>買った物</h2>
     <p class="lead">数字を直すと、すぐに詰め直します。「推測」の付いた商品は、レシートから特定しきれなかった物です。</p>
     <div class="tablewrap">
@@ -166,14 +187,12 @@
         <tbody id="itemRows"></tbody>
       </table>
     </div>
+    <div id="warnSec">
+      <h2>気をつけること</h2>
+      <ul class="warns" id="warnList"></ul>
+    </div>
+    <footer>商品のサイズと重さはAIによる目安です。袋の耐荷重は一般的な目安（レジ袋 小3kg・中5kg・大8kg など）で計算しています。</footer>
   </section>
-
-  <section id="warnSec">
-    <h2>気をつけること</h2>
-    <ul class="warns" id="warnList"></ul>
-  </section>
-
-  <footer>商品のサイズと重さはAIによる目安です。袋の耐荷重は一般的な目安（レジ袋 小3kg・中5kg・大8kg など）で計算しています。</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
