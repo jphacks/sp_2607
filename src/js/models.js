@@ -220,16 +220,61 @@ function fallback(w, h, d, shape, color){
   return g;
 }
 
+// ---------- 回転体で作る形（ペットボトル・缶・カップ・紙パック） ----------
+// 輪郭 [半径, 高さ]（どちらも 0〜1）を回して立体にする。本体は商品の色、ペットボトルのふたは白。
+// x,z が -1〜1、y が -0.5〜0.5 の単位の大きさで作り、最後に w,h,d へ伸ばす
+const PROFILE = {
+  bottle: [[0,0],[0.86,0],[0.97,0.03],[1,0.08],[1,0.56],[0.95,0.63],[0.72,0.74],[0.48,0.82],[0.36,0.86],[0.36,0.9],[0,0.9]],
+  can:    [[0,0],[0.84,0],[0.95,0.03],[1,0.08],[1,0.91],[0.88,0.97],[0.9,1],[0,1]],
+  cup:    [[0,0],[0.76,0],[0.8,0.03],[0.96,0.93],[1,0.95],[1,1],[0,1]]
+};
+const CAP = [[0,0.89],[0.42,0.89],[0.42,1],[0,1]];
+
+function lathe(prof, square){
+  const pts = prof.map(([r, y]) => new THREE.Vector2(r, y - 0.5));
+  if(!square) return new THREE.LatheGeometry(pts, 28);
+  // 角型：4面で回し、角が外寸の角に来るよう広げる。面は平らに見せる
+  const geo = new THREE.LatheGeometry(pts, 4, Math.PI / 4).toNonIndexed();
+  geo.scale(Math.SQRT2, 1, Math.SQRT2); geo.computeVertexNormals();
+  return geo;
+}
+
+// 単位の大きさの本体に輪郭線を付け、w,h,d に伸ばす。s は伸ばしたグループ（ふたなどを足すとき用）
+function fitted(w, h, d, geo, mat){
+  const g = new THREE.Group(), s = new THREE.Group(); s.scale.set(w / 2, h, d / 2); g.add(s);
+  const m = add(s, geo, mat);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color:0x000000, transparent:true, opacity:0.25 })));
+  return { g, s };
+}
+
+// ペットボトル：胴→肩→首＋白いキャップ。箱として扱う物（2Lなど）は角型
+function latheBottle(w, h, d, color, shape){
+  const { g, s } = fitted(w, h, d, lathe(PROFILE.bottle, shape === "box"), M(color, { r:0.45 }));
+  add(s, lathe(CAP), M("#F4F4F0", { r:0.4 }));
+  return g;
+}
+const latheCan = (w, h, d, color) => fitted(w, h, d, lathe(PROFILE.can), M(color, { r:0.35, m:0.3 })).g;
+const latheCup = (w, h, d, color) => fitted(w, h, d, lathe(PROFILE.cup), M(color, { r:0.55 })).g;
+
+// 紙パック：横から見た家形（屋根＋てっぺんの継ぎ目）を奥行き方向に押し出す
+function gableCarton(w, h, d, color){
+  const sh = new THREE.Shape();
+  [[-1,-0.5],[1,-0.5],[1,0.3],[0.06,0.44],[0.06,0.5],[-0.06,0.5],[-0.06,0.44],[-1,0.3]].forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y));
+  const geo = new THREE.ExtrudeGeometry(sh, { depth:2, bevelEnabled:false });
+  geo.translate(0, 0, -1);
+  return fitted(w, h, d, geo, M(color, { r:0.55 })).g;
+}
+
 const BUILDERS = {
-  pk: carton, pb: (w, h, d) => bottle(w, h, d, false), gb: (w, h, d) => bottle(w, h, d, true),
-  cn: can, cp: cup, eg: eggs, br: bread, sn: snack, vg: veggieBag, rv: roundVeg, lv: longVeg,
+  pk: gableCarton, pb: latheBottle, gb: (w, h, d) => bottle(w, h, d, true),
+  cn: latheCan, cp: latheCup, eg: eggs, br: bread, sn: snack, vg: veggieBag, rv: roundVeg, lv: longVeg,
   bn: banana, mt: meat, tf: deli, fz: frozen, bx: box, pc: pouch, tx: tissue
 };
 
 // kind: KINDS のコード、shape: "box"|"cylinder"|"soft"（種類が分からないとき用）、w,h,d: 普通に置いたときの幅・高さ・奥行き(cm)
 function build(kind, shape, w, h, d, color){
   const f = BUILDERS[kind];
-  return f ? f(w, h, d, color) : fallback(w, h, d, shape, color);
+  return f ? f(w, h, d, color, shape) : fallback(w, h, d, shape, color);
 }
 
 // ---------- 一度作ったモデルを保存して使い回す ----------
@@ -241,7 +286,8 @@ const CACHE_MAX = 200;
 const cache = new Map();
 const round = v => Math.round(v * 2) / 2;   // 0.5cm単位にそろえて、ほぼ同じ寸法は同じひな形にする
 function get(kind, shape, w, h, d, color){
-  const key = [kind || "-", kind ? "" : shape, round(w), round(h), round(d), kind && kind !== "bx" ? "" : color].join("|");
+  // ペットボトルは shape で丸型・角型が変わるので、shape も目印に入れる
+  const key = [kind || "-", kind && kind !== "pb" ? "" : shape, round(w), round(h), round(d), kind && kind !== "bx" ? "" : color].join("|");
   let tpl = cache.get(key);
   if(tpl){ cache.delete(key); cache.set(key, tpl); }   // 最近使った物を後ろへ（古い物から捨てるため）
   else{
