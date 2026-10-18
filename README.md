@@ -1,4 +1,4 @@
-# 袋づめ名人
+# 袋詰名人
 
 <!-- デモ動画ができたら、下の画像とリンクを差し替える -->
 [![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2026/07/IMG_5316.png)](https://www.youtube.com/watch?v=piaNsc6ilBI)
