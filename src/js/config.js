@@ -71,6 +71,7 @@ const KINDS = {
   bn:{ label:"バナナ",             color:"#F2CF3A" },
   mt:{ label:"肉・魚のトレー",     color:"#C9505C" },
   tf:{ label:"豆腐・惣菜パック",   color:"#E9E3D0" },
+  kc:{ label:"キムチ・漬物",       color:"#C8402E" },
   fz:{ label:"冷凍食品",           color:"#3D7CC9" },
   bx:{ label:"箱",                 color:"#E07A3F" },
   pc:{ label:"詰め替えパウチ",     color:"#2BA39A" },

@@ -38,7 +38,7 @@ function loadLimitOf(it){
 }
 
 // 上下を変えずに平らに置く物（卵・肉や魚のトレー・豆腐など）。AI の印 H か、種類から決める
-const FLAT_KINDS = new Set(["eg", "mt", "tf"]);
+const FLAT_KINDS = new Set(["eg", "mt", "tf", "kc"]);
 const isFlat = it => !!it.flat || FLAT_KINDS.has(it.kind);
 
 // 置き方の候補。立てる物・つぶれやすい物・平らに置く物は向きを変えない（横回転だけ）
